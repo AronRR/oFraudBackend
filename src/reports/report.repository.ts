@@ -77,6 +77,25 @@ export interface AuthorReportRow {
   lastEditedAt: Date | null;
 }
 
+export interface AdminReportRow {
+  reportId: number;
+  title: string | null;
+  status: ReportStatus;
+  categoryId: number;
+  categoryName: string | null;
+  authorId: number;
+  authorEmail: string | null;
+  authorName: string | null;
+  reviewerId: number | null;
+  reviewerName: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  reviewedAt: Date | null;
+  publishedAt: Date | null;
+  reviewNotes: string | null;
+  rejectionReasonText: string | null;
+}
+
 @Injectable()
 export class ReportRepository {
   constructor(private readonly dbService: DbService) {}
@@ -500,6 +519,109 @@ export class ReportRepository {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       lastEditedAt: row.revision_created_at ?? row.updated_at,
+    }));
+
+    return { items, total };
+  }
+
+  async findReportsForAdmin(params: {
+    status?: ReportStatus;
+    limit: number;
+    offset: number;
+  }): Promise<{ items: AdminReportRow[]; total: number }> {
+    const { status, limit, offset } = params;
+
+    const conditions: string[] = [];
+    if (status !== 'removed') {
+      conditions.push('r.deleted_at IS NULL');
+    }
+    const values: Array<number | string> = [];
+
+    if (status) {
+      conditions.push('r.status = ?');
+      values.push(status);
+    }
+
+    if (conditions.length === 0) {
+      conditions.push('1 = 1');
+    }
+
+    const baseQuery = `
+      FROM reports r
+      LEFT JOIN report_revisions rr ON rr.id = r.current_revision_id
+      LEFT JOIN categories c ON c.id = r.category_id
+      LEFT JOIN users u ON u.id = r.author_id
+      LEFT JOIN users reviewer ON reviewer.id = r.reviewed_by
+      WHERE ${conditions.join(' AND ')}
+    `;
+
+    const listQuery = `
+      SELECT
+        r.id AS report_id,
+        r.status,
+        r.category_id,
+        c.name AS category_name,
+        r.created_at,
+        r.updated_at,
+        r.reviewed_at,
+        r.published_at,
+        r.review_notes,
+        r.rejection_reason_text,
+        rr.title,
+        u.id AS author_id,
+        u.email AS author_email,
+        CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS author_name,
+        reviewer.id AS reviewer_id,
+        CONCAT(COALESCE(reviewer.first_name, ''), ' ', COALESCE(reviewer.last_name, '')) AS reviewer_name
+      ${baseQuery}
+      ORDER BY r.updated_at DESC, r.id DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await this.dbService
+      .getPool()
+      .query<RowDataPacket[]>(listQuery, [...values, limit, offset]);
+
+    const [countRows] = await this.dbService
+      .getPool()
+      .query<RowDataPacket[]>(`SELECT COUNT(*) as total ${baseQuery}`, values);
+
+    const total = Number((countRows as unknown as Array<{ total: number }>)[0]?.total ?? 0);
+
+    const items = (rows as unknown as Array<{
+      report_id: number;
+      status: ReportStatus;
+      category_id: number;
+      category_name: string | null;
+      created_at: Date;
+      updated_at: Date;
+      reviewed_at: Date | null;
+      published_at: Date | null;
+      review_notes: string | null;
+      rejection_reason_text: string | null;
+      title: string | null;
+      author_id: number;
+      author_email: string | null;
+      author_name: string | null;
+      reviewer_id: number | null;
+      reviewer_name: string | null;
+    }>).map((row) => ({
+      reportId: row.report_id,
+      title: row.title ?? null,
+      status: row.status,
+      categoryId: row.category_id,
+      categoryName: row.category_name ?? null,
+      authorId: row.author_id,
+      authorEmail: row.author_email ?? null,
+      authorName: row.author_name?.trim() ? row.author_name.trim() : null,
+      reviewerId: row.reviewer_id ?? null,
+      reviewerName: row.reviewer_name?.trim() ? row.reviewer_name.trim() : null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      reviewedAt: row.reviewed_at ?? null,
+      publishedAt: row.published_at ?? null,
+      reviewNotes: row.review_notes ?? null,
+      rejectionReasonText: row.rejection_reason_text ?? null,
     }));
 
     return { items, total };

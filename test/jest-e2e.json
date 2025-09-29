@@ -7,7 +7,8 @@
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/../src/$1",
     "^bcrypt$": "<rootDir>/mocks/bcrypt.ts",
-    "^class-transformer$": "<rootDir>/../node_modules/class-transformer/cjs/index.js"
+    "^class-transformer$": "<rootDir>/mocks/class-transformer.ts",
+    "^class-transformer/(.*)$": "<rootDir>/mocks/class-transformer.ts"
   },
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
