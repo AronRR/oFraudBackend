@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 
 import { Injectable } from '@nestjs/common';
-import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { DbService } from 'src/db/db.service';
 
 export type ReportStatus = 'pending' | 'approved' | 'rejected' | 'removed';
@@ -119,7 +119,7 @@ export class ReportRepository {
     },
   ): Promise<number> {
     const { authorId, categoryId, isAnonymous, status = 'pending' } = payload;
-    const [result] = await conn.query<{ insertId: number }>(
+    const [result] = await conn.query<ResultSetHeader>(
       'INSERT INTO reports (author_id, category_id, status, is_anonymous) VALUES (?, ?, ?, ?)',
       [authorId, categoryId, status, isAnonymous ? 1 : 0],
     );
@@ -139,7 +139,7 @@ export class ReportRepository {
       versionNumber: number;
     },
   ): Promise<number> {
-    const [result] = await conn.query<{ insertId: number }>(
+    const [result] = await conn.query<ResultSetHeader>(
       'INSERT INTO report_revisions (report_id, version_number, title, description, incident_url, publisher_host, is_anonymous, created_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         payload.reportId,
@@ -234,7 +234,7 @@ export class ReportRepository {
     conn: PoolConnection,
     payload: { revisionId: number; fileUrl: string; storageKey?: string | null; mediaType?: string; position: number },
   ): Promise<number> {
-    const [result] = await conn.query<{ insertId: number }>(
+    const [result] = await conn.query<ResultSetHeader>(
       'INSERT INTO report_media (revision_id, file_url, storage_key, media_type, position) VALUES (?, ?, ?, ?, ?)',
       [
         payload.revisionId,
