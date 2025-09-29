@@ -1,12 +1,13 @@
 /* eslint-disable prettier/prettier */
 
-import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, Req, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "src/common/interfaces/authenticated-request";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { UserService } from "src/users/user.service";
 import { LoginRequestDto } from "./dto/login-request.dto";
 import { LoginResponseDto } from "./dto/login-response.dto";
+import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { TokenService } from "./tokens.service";
 
 @ApiTags("Auth")
@@ -42,7 +43,7 @@ export class AuthController{
     }
 
     @Post("refresh")
-    async refresh(@Body() dto: {refreshToken: string}){
+    async refresh(@Body() dto: RefreshTokenDto){
         try{
             const profile= await this.tokenService.verifyRefresh(dto.refreshToken);
             const user= await this.userService.findById(Number(profile.sub));
@@ -55,8 +56,9 @@ export class AuthController{
                 role: user.role,
             });
             return {accessToken: newAccessToken};
-        }catch{
-            throw Error("Token de refresco inválido");
+        }catch(error){
+            // TODO: Consider implementing rate limiting or logging for repeated refresh failures.
+            throw new UnauthorizedException("Token de refresco inválido");
         }
     }
 
