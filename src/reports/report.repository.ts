@@ -66,6 +66,17 @@ export interface TopHostInsightRow {
   totalRatings: number;
 }
 
+export interface AuthorReportRow {
+  reportId: number;
+  title: string | null;
+  status: ReportStatus;
+  categoryId: number;
+  categoryName: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lastEditedAt: Date | null;
+}
+
 @Injectable()
 export class ReportRepository {
   constructor(private readonly dbService: DbService) {}
@@ -421,5 +432,83 @@ export class ReportRepository {
         }),
       ),
     };
+  }
+
+  async findReportsByAuthor(params: {
+    authorId: number;
+    status?: ReportStatus;
+    limit: number;
+    offset: number;
+  }): Promise<{ items: AuthorReportRow[]; total: number }> {
+    const { authorId, status, limit, offset } = params;
+
+    const conditions = ['r.author_id = ?', 'r.deleted_at IS NULL'];
+    const values: Array<number | string> = [authorId];
+
+    if (status) {
+      conditions.push('r.status = ?');
+      values.push(status);
+    }
+
+    const baseQuery = `
+      FROM reports r
+      LEFT JOIN report_revisions rr ON rr.id = r.current_revision_id
+      LEFT JOIN categories c ON c.id = r.category_id
+      WHERE ${conditions.join(' AND ')}
+    `;
+
+    const listQuery = `
+      SELECT
+        r.id AS report_id,
+        r.status,
+        r.category_id,
+        c.name AS category_name,
+        r.created_at,
+        r.updated_at,
+        rr.title,
+        rr.created_at AS revision_created_at
+      ${baseQuery}
+      ORDER BY r.updated_at DESC, r.id DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await this.dbService
+      .getPool()
+      .query<RowDataPacket[]>(listQuery, [...values, limit, offset]);
+
+    const [countRows] = await this.dbService
+      .getPool()
+      .query<RowDataPacket[]>(`SELECT COUNT(*) as total ${baseQuery}`, values);
+
+    const total = Number((countRows as unknown as Array<{ total: number }>)[0]?.total ?? 0);
+
+    const items = (rows as unknown as Array<{
+      report_id: number;
+      status: ReportStatus;
+      category_id: number;
+      category_name: string | null;
+      created_at: Date;
+      updated_at: Date;
+      title: string | null;
+      revision_created_at: Date | null;
+    }>).map((row) => ({
+      reportId: row.report_id,
+      title: row.title ?? null,
+      status: row.status,
+      categoryId: row.category_id,
+      categoryName: row.category_name ?? null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      lastEditedAt: row.revision_created_at ?? row.updated_at,
+    }));
+
+    return { items, total };
+  }
+
+  async softDeleteReport(conn: PoolConnection, reportId: number): Promise<void> {
+    await conn.query(
+      'UPDATE reports SET status = ?, deleted_at = NOW(), updated_at = NOW() WHERE id = ?',
+      ['removed', reportId],
+    );
   }
 }
