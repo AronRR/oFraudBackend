@@ -6,10 +6,11 @@ import { DbModule } from 'src/db/db.module';
 import { AuthModule } from 'src/auth/auth.module';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { AdminRoleGuard } from 'src/common/guards/admin-role.guard';
+import { ReportRepository } from 'src/reports/report.repository';
 
 @Module({
   imports: [DbModule, AuthModule],
   controllers: [AdminController],
-  providers: [AdminService, AdminRepository, JwtAuthGuard, AdminRoleGuard],
+  providers: [AdminService, AdminRepository, ReportRepository, JwtAuthGuard, AdminRoleGuard],
 })
 export class AdminModule {}

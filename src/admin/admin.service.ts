@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { RowDataPacket } from 'mysql2';
 import { AdminRepository } from './admin.repository';
+import { ReportRepository } from 'src/reports/report.repository';
+import { GetAdminReportsQueryDto } from './dto/get-admin-reports-query.dto';
+import { GetAdminReportsResponseDto } from './dto/get-admin-reports-response.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CategoryResponseDto } from './dto/category-response.dto';
@@ -11,7 +14,86 @@ import { MetricsTopHostDto } from './dto/metrics-top-host.dto';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly adminRepository: AdminRepository) {}
+  constructor(
+    private readonly adminRepository: AdminRepository,
+    private readonly reportRepository: ReportRepository,
+  ) {}
+
+  async listReports(query: GetAdminReportsQueryDto): Promise<GetAdminReportsResponseDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const offset = (page - 1) * limit;
+
+    const { items, total } = await this.reportRepository.findReportsForAdmin({
+      status: query.status,
+      limit,
+      offset,
+    });
+
+    return {
+      items: items.map((item) => ({
+        reportId: item.reportId,
+        title: item.title,
+        status: item.status,
+        categoryId: item.categoryId,
+        categoryName: item.categoryName,
+        author: {
+          id: item.authorId,
+          email: item.authorEmail,
+          name: item.authorName,
+        },
+        reviewer: item.reviewerId
+          ? {
+              id: item.reviewerId,
+              name: item.reviewerName,
+            }
+          : null,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+        reviewedAt: item.reviewedAt ? item.reviewedAt.toISOString() : null,
+        publishedAt: item.publishedAt ? item.publishedAt.toISOString() : null,
+        reviewNotes: item.reviewNotes ?? null,
+        rejectionReasonText: item.rejectionReasonText ?? null,
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+      },
+    };
+  }
+
+  async removeReport(reportId: number, adminId: number): Promise<void> {
+    await this.reportRepository.withTransaction(async (conn) => {
+      const existing = await this.reportRepository.findReportForUpdate(reportId, conn);
+      if (!existing) {
+        throw new NotFoundException('Reporte no encontrado');
+      }
+
+      await this.reportRepository.updateReportStatus(conn, {
+        reportId,
+        status: 'removed',
+        reviewerId: adminId,
+        reviewNotes: null,
+        rejectionReasonId: null,
+        rejectionReasonText: null,
+        lock: true,
+        approvedAt: null,
+        publishedAt: null,
+      });
+
+      await this.reportRepository.softDeleteReport(conn, reportId);
+      await this.reportRepository.appendStatusHistory(conn, {
+        reportId,
+        fromStatus: existing.status,
+        toStatus: 'removed',
+        changedBy: adminId,
+        rejectionReasonId: null,
+        rejectionReasonText: null,
+        note: 'Removed by admin',
+      });
+    });
+  }
 
   async listCategories(): Promise<CategoryResponseDto[]> {
     const rows = await this.adminRepository.listCategories();
