@@ -3,11 +3,14 @@
 import { Injectable } from "@nestjs/common"
 import { JwtService } from "@nestjs/jwt"
 
-export type UserProfile ={
-    id:string, 
-    email:string,
-    name:string
-}
+export type UserRole = 'user' | 'admin' | 'moderator';
+
+export type UserProfile = {
+    id: string;
+    email: string;
+    name: string;
+    role: UserRole;
+};
 
 export type AccessPayload={
     sub:string,

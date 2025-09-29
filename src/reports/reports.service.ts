@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import type { UserRole } from 'src/auth/tokens.service';
 import { extractHostFromUrl } from 'src/util/url.util';
 import { ReportRepository, ReportStatus } from './report.repository';
 import { CreateReportDto } from './dto/create-report.dto';
@@ -10,7 +11,7 @@ import { RejectionReasonRepository } from './rejection-reason.repository';
 
 interface UserContext {
   userId: number;
-  role?: string;
+  role?: UserRole;
 }
 
 @Injectable()
