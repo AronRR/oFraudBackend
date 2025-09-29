@@ -1,6 +1,6 @@
 /* eslint-disable prettier/prettier */
 
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request';
@@ -11,6 +11,8 @@ import { AddMediaDto } from './dto/add-media.dto';
 import { ModerateReportDto } from './dto/moderate-report.dto';
 import { GetReportsQueryDto } from './dto/get-reports-query.dto';
 import { GetReportsResponseDto } from './dto/get-reports-response.dto';
+import { GetMyReportsQueryDto } from './dto/get-my-reports-query.dto';
+import { GetMyReportsResponseDto } from './dto/get-my-reports-response.dto';
 
 @ApiTags('Reports')
 @Controller('reports')
@@ -22,6 +24,18 @@ export class ReportsController {
   @ApiOkResponse({ type: GetReportsResponseDto })
   async listApprovedReports(@Query() query: GetReportsQueryDto): Promise<GetReportsResponseDto> {
     return this.reportsService.getApprovedReports(query);
+  }
+
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Listar reportes creados por el usuario autenticado' })
+  @ApiOkResponse({ type: GetMyReportsResponseDto })
+  async listMyReports(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: GetMyReportsQueryDto,
+  ): Promise<GetMyReportsResponseDto> {
+    const userId = Number(req.user.userId);
+    return this.reportsService.getMyReports({ userId }, query);
   }
 
   @Post()
@@ -70,6 +84,17 @@ export class ReportsController {
         note: dto.note,
       },
     );
+    return { success: true };
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  async deleteReport(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) reportId: number,
+  ): Promise<{ success: true }> {
+    const userId = Number(req.user.userId);
+    await this.reportsService.deleteReport(reportId, { userId });
     return { success: true };
   }
 }
