@@ -3,6 +3,12 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "moduleDirectories": ["node_modules", "<rootDir>/../node_modules"],
+  "moduleNameMapper": {
+    "^src/(.*)$": "<rootDir>/../src/$1",
+    "^bcrypt$": "<rootDir>/mocks/bcrypt.ts",
+    "^class-transformer$": "<rootDir>/../node_modules/class-transformer/cjs/index.js"
+  },
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   }
