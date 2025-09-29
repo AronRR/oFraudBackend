@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 
-import { Body, Controller, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request';
 import { ReportsService } from './reports.service';
@@ -8,10 +9,20 @@ import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { AddMediaDto } from './dto/add-media.dto';
 import { ModerateReportDto } from './dto/moderate-report.dto';
+import { GetReportsQueryDto } from './dto/get-reports-query.dto';
+import { GetReportsResponseDto } from './dto/get-reports-response.dto';
 
+@ApiTags('Reports')
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Obtener feed público de reportes aprobados' })
+  @ApiOkResponse({ type: GetReportsResponseDto })
+  async listApprovedReports(@Query() query: GetReportsQueryDto): Promise<GetReportsResponseDto> {
+    return this.reportsService.getApprovedReports(query);
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard)
