@@ -1,4 +1,4 @@
-import { ForbiddenException } from "@nestjs/common";
+import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import { AuthController } from "./auth.controller";
 import { TokenService } from "./tokens.service";
 import { UserService } from "src/users/user.service";
@@ -67,6 +67,17 @@ describe("AuthController", () => {
 
             await expect(controller.login({ email: "user@example.com", password: "Passw0rd" })).rejects.toBeInstanceOf(
                 ForbiddenException,
+            );
+
+            expect(tokenService.generateAccess).not.toHaveBeenCalled();
+            expect(tokenService.generateRefresh).not.toHaveBeenCalled();
+        });
+
+        it("should return unauthorized when the email does not exist", async () => {
+            userService.login.mockRejectedValue(new UnauthorizedException("Usuario no encontrado"));
+
+            await expect(controller.login({ email: "missing@example.com", password: "Passw0rd" })).rejects.toBeInstanceOf(
+                UnauthorizedException,
             );
 
             expect(tokenService.generateAccess).not.toHaveBeenCalled();
