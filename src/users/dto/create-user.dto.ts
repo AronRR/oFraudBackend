@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 
 import { ApiProperty } from "@nestjs/swagger";
-import { UserRole } from "../user.repository";
+import type { UserRole } from "../user.repository";
 
 export class CreateUserDto {
     @ApiProperty({ example: "user@example.com", description: "Email del usuario" })
@@ -22,6 +22,6 @@ export class CreateUserDto {
     @ApiProperty({ example: "password123", description: "Contraseña del usuario" })
     password: string;
 
-    @ApiProperty({ enum: ["user", "admin"], required: false, description: "Rol del usuario" })
+    @ApiProperty({ enum: ["user", "admin", "moderator"], required: false, description: "Rol del usuario" })
     role?: UserRole;
 }
