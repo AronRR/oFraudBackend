@@ -3,6 +3,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { AdminRoleGuard } from 'src/common/guards/admin-role.guard';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request';
 import { ReportsService } from './reports.service';
 import { CreateReportDto } from './dto/create-report.dto';
@@ -75,7 +76,8 @@ export class ReportsController {
   }
 
   @Post('moderate')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
+  @ApiOperation({ summary: 'Moderar reportes enviados por la comunidad', description: 'Requiere rol de administrador.' })
   async moderateReport(@Req() req: AuthenticatedRequest, @Body() dto: ModerateReportDto) {
     const userId = Number(req.user.userId);
     const role = req.user.role;
