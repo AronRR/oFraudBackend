@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn } from 'class-validator';
-import { ReportFlagStatus } from 'src/reports/report-flag.repository';
 
 const RESOLUTION_STATUSES = ['validated', 'dismissed'] as const;
 type ResolutionStatus = (typeof RESOLUTION_STATUSES)[number];
