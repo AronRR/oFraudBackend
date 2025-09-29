@@ -1,8 +1,17 @@
 /* eslint-disable prettier/prettier */
 
-import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    Injectable,
+    NotFoundException,
+    UnauthorizedException,
+} from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { CreateUserDto } from "./dto/create-user.dto";
+import { UpdateUserPasswordDto } from "./dto/update-user-password.dto";
+import { UpdateUserProfileDto } from "./dto/update-user-profile.dto";
 import { User, UserRepository } from "./user.repository";
 
 @Injectable()
@@ -57,6 +66,94 @@ export class UserService {
         return this.userRepository.findById(id);
     }
 
+    async updateProfile(userId: number, dto: UpdateUserProfileDto): Promise<User> {
+        const hasProfileChanges =
+            dto.firstName !== undefined ||
+            dto.lastName !== undefined ||
+            dto.username !== undefined ||
+            dto.phoneNumber !== undefined;
+
+        if (!hasProfileChanges) {
+            throw new BadRequestException("No se recibieron cambios para actualizar");
+        }
+
+        const sanitizedFirstName = this.sanitizeOptionalName(dto.firstName, "El nombre no puede estar vacío");
+        const sanitizedLastName = this.sanitizeOptionalName(dto.lastName, "El apellido no puede estar vacío");
+        const sanitizedUsername = this.sanitizeOptionalName(
+            dto.username,
+            "El nombre de usuario no puede estar vacío",
+        );
+
+        let sanitizedPhone: string | null | undefined = undefined;
+        if (dto.phoneNumber !== undefined) {
+            if (dto.phoneNumber === null) {
+                sanitizedPhone = null;
+            } else {
+                const trimmedPhone = dto.phoneNumber.trim();
+                if (trimmedPhone.length === 0) {
+                    sanitizedPhone = null;
+                } else {
+                    sanitizedPhone = trimmedPhone;
+                }
+            }
+        }
+
+        const updatePayload: {
+            first_name?: string;
+            last_name?: string;
+            username?: string;
+            phone_number?: string | null;
+        } = {};
+
+        if (sanitizedFirstName !== undefined) {
+            updatePayload.first_name = sanitizedFirstName;
+        }
+        if (sanitizedLastName !== undefined) {
+            updatePayload.last_name = sanitizedLastName;
+        }
+        if (sanitizedUsername !== undefined) {
+            updatePayload.username = sanitizedUsername;
+        }
+        if (dto.phoneNumber !== undefined) {
+            updatePayload.phone_number = sanitizedPhone ?? null;
+        }
+
+        try {
+            const updatedUser = await this.userRepository.updateProfile(userId, updatePayload);
+
+            if (!updatedUser) {
+                throw new NotFoundException("Usuario no encontrado");
+            }
+
+            return updatedUser;
+        } catch (error) {
+            if (this.isDuplicateEntryError(error)) {
+                throw new ConflictException("El nombre de usuario ya existe");
+            }
+            throw error;
+        }
+    }
+
+    async changePassword(userId: number, dto: UpdateUserPasswordDto): Promise<void> {
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+            throw new NotFoundException("Usuario no encontrado");
+        }
+
+        const isPasswordValid = await bcrypt.compare(dto.currentPassword, user.password_hash);
+        if (!isPasswordValid) {
+            throw new UnauthorizedException("La contraseña actual es incorrecta");
+        }
+
+        if (dto.currentPassword === dto.newPassword) {
+            throw new BadRequestException("La nueva contraseña debe ser diferente a la actual");
+        }
+
+        const salt = await bcrypt.genSalt();
+        const hashedPassword = await bcrypt.hash(dto.newPassword, salt);
+        await this.userRepository.updatePassword(userId, hashedPassword, salt);
+    }
+
     private isDuplicateEntryError(error: unknown): boolean {
         return (
             typeof error === "object" &&
@@ -64,6 +161,18 @@ export class UserService {
             "code" in error &&
             (error as { code?: string }).code === "ER_DUP_ENTRY"
         );
+    }
+
+    private sanitizeOptionalName(value: string | undefined, emptyMessage: string): string | undefined {
+        if (value === undefined) {
+            return undefined;
+        }
+
+        const trimmed = value.trim();
+        if (!trimmed) {
+            throw new BadRequestException(emptyMessage);
+        }
+        return trimmed;
     }
 
     private isUserBlocked(user: User): boolean {

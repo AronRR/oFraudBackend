@@ -39,6 +39,10 @@ export type CreateUserRecord = {
     role?: UserRole;
 };
 
+export type UpdateUserProfileRecord = Partial<
+    Pick<User, "first_name" | "last_name" | "phone_number" | "username">
+>;
+
 @Injectable()
 export class UserRepository {
     constructor(private readonly dbService: DbService) {}
@@ -92,5 +96,85 @@ export class UserRepository {
         const sql =
             "INSERT INTO user_block_events (user_id, action, reason, blocked_by_user_id) VALUES (?, 'blocked', ?, ?)";
         await this.dbService.getPool().execute(sql, [userId, reason ?? null, blockedByUserId]);
+    }
+
+    async updateProfile(userId: number, updates: UpdateUserProfileRecord): Promise<User | null> {
+        const currentUser = await this.findById(userId);
+        if (!currentUser) {
+            return null;
+        }
+
+        const fields: string[] = [];
+        const values: (string | null)[] = [];
+        const changes: { field: string; oldValue: string | null; newValue: string | null }[] = [];
+
+        const applyChange = (
+            column: keyof UpdateUserProfileRecord,
+            newValue: string | null | undefined,
+            oldValue: string | null,
+        ): void => {
+            if (newValue === undefined || newValue === oldValue) {
+                return;
+            }
+            const columnName = column as string;
+            fields.push(`${columnName} = ?`);
+            values.push(newValue);
+            changes.push({ field: columnName, oldValue, newValue });
+        };
+
+        applyChange("first_name", updates.first_name, currentUser.first_name);
+        applyChange("last_name", updates.last_name, currentUser.last_name);
+        applyChange("username", updates.username, currentUser.username);
+        applyChange("phone_number", updates.phone_number, currentUser.phone_number);
+
+        if (fields.length === 0) {
+            return currentUser;
+        }
+
+        const sql = `UPDATE users SET ${fields.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+        const pool = this.dbService.getPool();
+        await pool.execute<ResultSetHeader>(sql, [...values, userId]);
+
+        await this.recordProfileAudit(userId, changes);
+
+        return this.findById(userId);
+    }
+
+    async updatePassword(userId: number, passwordHash: string, passwordSalt: string): Promise<void> {
+        const sql =
+            "UPDATE users SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+        const pool = this.dbService.getPool();
+        await pool.execute<ResultSetHeader>(sql, [passwordHash, passwordSalt, userId]);
+        await this.recordPasswordAudit(userId);
+    }
+
+    private async recordProfileAudit(
+        userId: number,
+        changes: { field: string; oldValue: string | null; newValue: string | null }[],
+    ): Promise<void> {
+        if (changes.length === 0) {
+            return;
+        }
+
+        const sql =
+            "INSERT INTO user_profile_audit (user_id, field, old_value, new_value) VALUES (?, ?, ?, ?)";
+        const pool = this.dbService.getPool();
+        for (const change of changes) {
+            try {
+                await pool.execute(sql, [userId, change.field, change.oldValue, change.newValue]);
+            } catch {
+                // El fallo en la auditoría no debe afectar la operación principal.
+            }
+        }
+    }
+
+    private async recordPasswordAudit(userId: number): Promise<void> {
+        const sql =
+            "INSERT INTO user_security_audit (user_id, action) VALUES (?, 'password_changed')";
+        try {
+            await this.dbService.getPool().execute(sql, [userId]);
+        } catch {
+            // La auditoría es opcional y no debe bloquear la actualización.
+        }
     }
 }
