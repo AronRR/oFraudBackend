@@ -43,7 +43,9 @@ export class UserService {
 
     async login(email: string, password: string): Promise<User> {
         const user = await this.userRepository.findByEmail(email);
-        if (!user) throw Error("Usuario no encontrado");
+        if (!user) {
+            throw new UnauthorizedException("Usuario no encontrado");
+        }
 
         if (this.isUserBlocked(user)) {
             await this.recordBlockedLoginAttempt(user);

@@ -22,8 +22,6 @@ export class AuthController{
     @ApiOkResponse({ description: "Tokens generados correctamente", type: LoginResponseDto })
     async login(@Body() dto: LoginRequestDto): Promise<LoginResponseDto>{
         const usuario= await this.userService.login(dto.email, dto.password);
-        if(!usuario)
-            throw Error("Usuario no encontrado");
         const userName = `${usuario.first_name} ${usuario.last_name}`.trim() || usuario.username;
         const userProfile = {
             id: usuario.id.toString(),

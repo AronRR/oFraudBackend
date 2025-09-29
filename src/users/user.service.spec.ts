@@ -130,10 +130,12 @@ describe("UserService", () => {
             });
         });
 
-        it("should throw when user does not exist", async () => {
+        it("should throw unauthorized when user does not exist", async () => {
             userRepository.findByEmail.mockResolvedValue(null);
 
-            await expect(service.login(createUserDto.email, createUserDto.password)).rejects.toThrow("Usuario no encontrado");
+            await expect(service.login(createUserDto.email, createUserDto.password)).rejects.toBeInstanceOf(
+                UnauthorizedException,
+            );
         });
 
         it("should reject invalid passwords using bcrypt.compare", async () => {
