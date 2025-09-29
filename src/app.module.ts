@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DbModule } from './db/db.module';
@@ -13,7 +14,7 @@ import { ReportsModule } from './reports/reports.module';
 import { AdminModule } from './admin/admin.module';
 
 @Module({
-  imports: [JwtModule.register({
+  imports: [ConfigModule.forRoot({ isGlobal: true }), JwtModule.register({
       global: true,
       secret:"supersecret"
   }), 
