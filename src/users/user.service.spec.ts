@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UserService } from "./user.service";
@@ -7,6 +7,7 @@ type MockUserRepository = {
     registerUser: jest.Mock;
     findByEmail: jest.Mock;
     findById: jest.Mock;
+    recordBlockedLoginAttempt: jest.Mock;
 };
 
 type User = {
@@ -72,6 +73,7 @@ describe("UserService", () => {
             registerUser: jest.fn(),
             findByEmail: jest.fn(),
             findById: jest.fn(),
+            recordBlockedLoginAttempt: jest.fn(),
         };
         service = new UserService(userRepository as unknown as any);
     });
@@ -147,6 +149,27 @@ describe("UserService", () => {
 
             await expect(service.login(createUserDto.email, createUserDto.password)).rejects.toBeInstanceOf(
                 UnauthorizedException,
+            );
+        });
+
+        it("should forbid blocked users and register the attempt when possible", async () => {
+            userRepository.recordBlockedLoginAttempt.mockResolvedValue(undefined);
+
+            userRepository.findByEmail.mockResolvedValue({
+                ...baseUser,
+                is_blocked: 1,
+                blocked_reason: "Cuenta bloqueada por fraude",
+                blocked_by: 99,
+            });
+
+            await expect(service.login(createUserDto.email, createUserDto.password)).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+
+            expect(userRepository.recordBlockedLoginAttempt).toHaveBeenCalledWith(
+                baseUser.id,
+                99,
+                "Cuenta bloqueada por fraude",
             );
         });
     });

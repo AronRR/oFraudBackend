@@ -83,4 +83,14 @@ export class UserRepository {
         const users = rows as unknown as User[];
         return users.length > 0 ? users[0] : null;
     }
+
+    async recordBlockedLoginAttempt(
+        userId: number,
+        blockedByUserId: number,
+        reason: string | null,
+    ): Promise<void> {
+        const sql =
+            "INSERT INTO user_block_events (user_id, action, reason, blocked_by_user_id) VALUES (?, 'blocked', ?, ?)";
+        await this.dbService.getPool().execute(sql, [userId, reason ?? null, blockedByUserId]);
+    }
 }

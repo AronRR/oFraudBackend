@@ -1,12 +1,15 @@
 /* eslint-disable prettier/prettier */
 
-import { UserService } from "src/users/user.service";
-import { TokenService } from "./tokens.service";
 import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
-import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
+import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "src/common/interfaces/authenticated-request";
-import { ApiBearerAuth } from "@nestjs/swagger";
+import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
+import { UserService } from "src/users/user.service";
+import { LoginRequestDto } from "./dto/login-request.dto";
+import { LoginResponseDto } from "./dto/login-response.dto";
+import { TokenService } from "./tokens.service";
 
+@ApiTags("Auth")
 @Controller("auth")
 export class AuthController{
     constructor(private readonly tokenService: TokenService,
@@ -14,7 +17,10 @@ export class AuthController{
     ){}
     
     @Post("login")
-    async login(@Body() dto:{email:string, password:string}){
+    @ApiOperation({ summary: "Iniciar sesión" })
+    @ApiBody({ type: LoginRequestDto, description: "Credenciales de acceso" })
+    @ApiOkResponse({ description: "Tokens generados correctamente", type: LoginResponseDto })
+    async login(@Body() dto: LoginRequestDto): Promise<LoginResponseDto>{
         const usuario= await this.userService.login(dto.email, dto.password);
         if(!usuario)
             throw Error("Usuario no encontrado");
@@ -27,7 +33,7 @@ export class AuthController{
         };
         const accessToken = await this.tokenService.generateAccess(userProfile);
         const refreshToken= await this.tokenService.generateRefresh(usuario.id.toString());
-        return { accessToken, refreshToken };
+        return { message: "Inicio de sesión exitoso", accessToken, refreshToken };
     }
 
     @Get("profile")
