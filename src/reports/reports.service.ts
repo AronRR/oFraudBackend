@@ -7,10 +7,11 @@ import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { AddMediaDto } from './dto/add-media.dto';
 import { RejectionReasonRepository } from './rejection-reason.repository';
+import { UserRole } from 'src/users/user.types';
 
 interface UserContext {
   userId: number;
-  role?: string;
+  role?: UserRole;
 }
 
 @Injectable()
@@ -125,15 +126,18 @@ export class ReportsService {
     });
   }
 
-  async moderateReport(admin: UserContext, payload: {
-    action: 'approve' | 'reject';
-    reportId: number;
-    revisionId?: number;
-    rejectionReasonId?: number;
-    rejectionReasonCode?: string | null;
-    rejectionReasonText?: string | null;
-    note?: string | null;
-  }): Promise<void> {
+  async moderateReport(
+    admin: UserContext,
+    payload: {
+      action: 'approve' | 'reject';
+      reportId: number;
+      revisionId?: number;
+      rejectionReasonId?: number;
+      rejectionReasonCode?: string | null;
+      rejectionReasonText?: string | null;
+      note?: string | null;
+    },
+  ): Promise<void> {
     if (admin.role !== 'admin' && admin.role !== 'moderator') {
       throw new ForbiddenException('Insufficient permissions');
     }
