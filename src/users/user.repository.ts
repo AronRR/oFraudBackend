@@ -9,6 +9,7 @@ export type User= {
     name: string;
     password_hash: string;
     salt: string;
+    role: "user" | "admin" | "moderator";
 }
 
 

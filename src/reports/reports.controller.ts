@@ -46,7 +46,7 @@ export class ReportsController {
   @UseGuards(JwtAuthGuard)
   async moderateReport(@Req() req: AuthenticatedRequest, @Body() dto: ModerateReportDto) {
     const userId = Number(req.user.profile?.id);
-    const role = req.user.raw?.profile?.['role'] ?? 'user';
+    const role = req.user.profile.role ?? 'user';
     await this.reportsService.moderateReport(
       { userId, role },
       {
