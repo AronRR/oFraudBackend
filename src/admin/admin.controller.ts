@@ -11,6 +11,8 @@ import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-r
 import { MetricsOverviewDto } from './dto/metrics-overview.dto';
 import { MetricsTopCategoryDto } from './dto/metrics-top-category.dto';
 import { MetricsTopHostDto } from './dto/metrics-top-host.dto';
+import { GetAdminReportsQueryDto } from './dto/get-admin-reports-query.dto';
+import { GetAdminReportsResponseDto } from './dto/get-admin-reports-response.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -18,6 +20,13 @@ import { MetricsTopHostDto } from './dto/metrics-top-host.dto';
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
+
+  @Get('reports')
+  @ApiOperation({ summary: 'Listar reportes para la consola de moderación' })
+  @ApiOkResponse({ type: GetAdminReportsResponseDto })
+  async listReports(@Query() query: GetAdminReportsQueryDto): Promise<GetAdminReportsResponseDto> {
+    return this.adminService.listReports(query);
+  }
 
   @Get('categories')
   @ApiOperation({ summary: 'Listar categorías con sus contadores' })
@@ -64,6 +73,18 @@ export class AdminController {
   ): Promise<void> {
     const adminId = Number(req.user.userId);
     await this.adminService.unblockUser(id, adminId);
+  }
+
+  @Delete('reports/:id')
+  @ApiOperation({ summary: 'Eliminar un reporte desde la consola de administración' })
+  @ApiOkResponse({ description: 'Reporte eliminado correctamente' })
+  async removeReport(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{ success: true }> {
+    const adminId = Number(req.user.userId);
+    await this.adminService.removeReport(id, adminId);
+    return { success: true };
   }
 
   @Get('metrics/overview')
