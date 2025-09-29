@@ -9,6 +9,8 @@ import { UpdateReportDto } from './dto/update-report.dto';
 import { AddMediaDto } from './dto/add-media.dto';
 import { GetReportsQueryDto, ReportsFeedSort } from './dto/get-reports-query.dto';
 import { GetReportsResponseDto } from './dto/get-reports-response.dto';
+import { GetMyReportsQueryDto } from './dto/get-my-reports-query.dto';
+import { GetMyReportsResponseDto } from './dto/get-my-reports-response.dto';
 import { RejectionReasonRepository } from './rejection-reason.repository';
 
 interface UserContext {
@@ -62,6 +64,37 @@ export class ReportsService {
           averageRating: item.averageRating != null ? Number(item.averageRating) : null,
           totalRatings: item.totalRatings,
         })),
+      },
+    };
+  }
+
+  async getMyReports(user: UserContext, query: GetMyReportsQueryDto): Promise<GetMyReportsResponseDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const offset = (page - 1) * limit;
+
+    const { items, total } = await this.reportRepository.findReportsByAuthor({
+      authorId: user.userId,
+      status: query.status,
+      limit,
+      offset,
+    });
+
+    return {
+      items: items.map((item) => ({
+        reportId: item.reportId,
+        title: item.title,
+        status: item.status,
+        categoryId: item.categoryId,
+        categoryName: item.categoryName,
+        createdAt: item.createdAt.toISOString(),
+        lastEditedAt: item.lastEditedAt ? item.lastEditedAt.toISOString() : null,
+        updatedAt: item.updatedAt.toISOString(),
+      })),
+      meta: {
+        page,
+        limit,
+        total,
       },
     };
   }
@@ -256,6 +289,29 @@ export class ReportsService {
         rejectionReasonCode,
         rejectionReasonText,
         note: payload.note ?? null,
+      });
+    });
+  }
+
+  async deleteReport(reportId: number, user: UserContext): Promise<void> {
+    await this.reportRepository.withTransaction(async (conn) => {
+      const report = await this.reportRepository.findReportForUpdate(reportId, conn);
+      if (!report) {
+        throw new NotFoundException('Report not found');
+      }
+      if (report.author_id !== user.userId) {
+        throw new ForbiddenException('You cannot delete this report');
+      }
+      if (report.status !== 'pending') {
+        throw new BadRequestException('Only pending reports can be deleted');
+      }
+
+      await this.reportRepository.softDeleteReport(conn, reportId);
+      await this.reportRepository.appendStatusHistory(conn, {
+        reportId,
+        fromStatus: report.status,
+        toStatus: 'removed',
+        changedBy: user.userId,
       });
     });
   }
