@@ -511,4 +511,27 @@ export class ReportRepository {
       ['removed', reportId],
     );
   }
+
+  async recalculateRatingSummary(
+    conn: PoolConnection,
+    reportId: number,
+  ): Promise<{ average: number; count: number }> {
+    const [rows] = await conn.query<RowDataPacket[]>(
+      `SELECT COALESCE(AVG(score), 0) AS avg_score, COUNT(*) AS total
+       FROM report_ratings
+       WHERE report_id = ?`,
+      [reportId],
+    );
+
+    const stats = rows as unknown as Array<{ avg_score: string | number; total: number }>;
+    const average = Number(stats[0]?.avg_score ?? 0);
+    const count = Number(stats[0]?.total ?? 0);
+
+    await conn.query(
+      'UPDATE reports SET rating_average = ?, rating_count = ?, updated_at = NOW() WHERE id = ?',
+      [average, count, reportId],
+    );
+
+    return { average, count };
+  }
 }

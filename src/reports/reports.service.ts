@@ -1,9 +1,11 @@
 /* eslint-disable prettier/prettier */
 
-import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import type { UserRole } from 'src/auth/tokens.service';
 import { extractHostFromUrl } from 'src/util/url.util';
 import { ReportRepository, ReportStatus, type FindApprovedReportsSort } from './report.repository';
+import { ReportRatingRepository, type ReportRatingRecord } from './report-rating.repository';
+import { ReportCommentRepository, type ReportCommentRecord } from './report-comment.repository';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { AddMediaDto } from './dto/add-media.dto';
@@ -12,6 +14,13 @@ import { GetReportsResponseDto } from './dto/get-reports-response.dto';
 import { GetMyReportsQueryDto } from './dto/get-my-reports-query.dto';
 import { GetMyReportsResponseDto } from './dto/get-my-reports-response.dto';
 import { RejectionReasonRepository } from './rejection-reason.repository';
+import { CreateReportRatingDto } from './dto/create-report-rating.dto';
+import { UpdateReportRatingDto } from './dto/update-report-rating.dto';
+import { ReportRatingResponseDto, ReportRatingSummaryDto } from './dto/report-rating-response.dto';
+import { CreateReportCommentDto } from './dto/create-report-comment.dto';
+import { UpdateReportCommentDto } from './dto/update-report-comment.dto';
+import { GetReportCommentsQueryDto } from './dto/get-report-comments-query.dto';
+import { GetReportCommentsResponseDto, ReportCommentDto } from './dto/get-report-comments-response.dto';
 
 interface UserContext {
   userId: number;
@@ -20,11 +29,14 @@ interface UserContext {
 
 @Injectable()
 export class ReportsService {
+  private readonly logger = new Logger(ReportsService.name);
   private readonly MAX_MEDIA_PER_REVISION = 5;
 
   constructor(
     private readonly reportRepository: ReportRepository,
     private readonly rejectionReasonRepository: RejectionReasonRepository,
+    private readonly reportRatingRepository: ReportRatingRepository,
+    private readonly reportCommentRepository: ReportCommentRepository,
   ) {}
 
   async getApprovedReports(query: GetReportsQueryDto): Promise<GetReportsResponseDto> {
@@ -314,5 +326,277 @@ export class ReportsService {
         changedBy: user.userId,
       });
     });
+  }
+
+  async createReportRating(
+    reportId: number,
+    user: UserContext,
+    dto: CreateReportRatingDto,
+  ): Promise<ReportRatingResponseDto> {
+    return this.reportRepository.withTransaction(async (conn) => {
+      const report = await this.reportRepository.findReportForUpdate(reportId, conn);
+      if (!report || report.status !== 'approved') {
+        throw new NotFoundException('Report not available for ratings');
+      }
+
+      const existing = await this.reportRatingRepository.findByReportAndUser(reportId, user.userId, conn);
+      if (existing) {
+        throw new BadRequestException('You have already rated this report');
+      }
+
+      const ratingId = await this.reportRatingRepository.insertRating(conn, {
+        reportId,
+        userId: user.userId,
+        score: dto.score,
+        comment: dto.comment ?? null,
+      });
+
+      const rating = await this.reportRatingRepository.findById(ratingId, conn);
+      if (!rating) {
+        throw new NotFoundException('Rating not found after creation');
+      }
+
+      const summary = await this.reportRepository.recalculateRatingSummary(conn, reportId);
+
+      this.logger.log(`User ${user.userId} rated report ${reportId} with score ${rating.score}`);
+
+      return this.mapRatingRecordToResponse(rating, summary);
+    });
+  }
+
+  async updateReportRating(
+    reportId: number,
+    ratingId: number,
+    user: UserContext,
+    dto: UpdateReportRatingDto,
+  ): Promise<ReportRatingResponseDto> {
+    return this.reportRepository.withTransaction(async (conn) => {
+      const report = await this.reportRepository.findReportForUpdate(reportId, conn);
+      if (!report || report.status !== 'approved') {
+        throw new NotFoundException('Report not available for ratings');
+      }
+
+      const existing = await this.reportRatingRepository.findById(ratingId, conn);
+      if (!existing || existing.report_id !== reportId) {
+        throw new NotFoundException('Rating not found');
+      }
+
+      if (existing.user_id !== user.userId && user.role !== 'admin') {
+        throw new ForbiddenException('You cannot modify this rating');
+      }
+
+      const payload: { score?: number; comment?: string | null } = {};
+      if (dto.score != null) {
+        payload.score = dto.score;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'comment')) {
+        payload.comment = dto.comment ?? null;
+      }
+
+      if (!Object.keys(payload).length) {
+        throw new BadRequestException('No changes provided');
+      }
+
+      await this.reportRatingRepository.updateRating(conn, ratingId, payload);
+
+      const rating = await this.reportRatingRepository.findById(ratingId, conn);
+      if (!rating) {
+        throw new NotFoundException('Rating not found after update');
+      }
+
+      const summary = await this.reportRepository.recalculateRatingSummary(conn, reportId);
+
+      this.logger.log(`User ${user.userId} updated rating ${ratingId} on report ${reportId}`);
+
+      return this.mapRatingRecordToResponse(rating, summary);
+    });
+  }
+
+  async deleteReportRating(
+    reportId: number,
+    ratingId: number,
+    user: UserContext,
+  ): Promise<{ summary: ReportRatingSummaryDto }> {
+    return this.reportRepository.withTransaction(async (conn) => {
+      const report = await this.reportRepository.findReportForUpdate(reportId, conn);
+      if (!report || report.status !== 'approved') {
+        throw new NotFoundException('Report not available for ratings');
+      }
+
+      const existing = await this.reportRatingRepository.findById(ratingId, conn);
+      if (!existing || existing.report_id !== reportId) {
+        throw new NotFoundException('Rating not found');
+      }
+
+      if (existing.user_id !== user.userId && user.role !== 'admin') {
+        throw new ForbiddenException('You cannot delete this rating');
+      }
+
+      await this.reportRatingRepository.deleteRating(conn, ratingId);
+      const summary = await this.reportRepository.recalculateRatingSummary(conn, reportId);
+
+      this.logger.log(`User ${user.userId} deleted rating ${ratingId} on report ${reportId}`);
+
+      return { summary };
+    });
+  }
+
+  async createReportComment(
+    reportId: number,
+    user: UserContext,
+    dto: CreateReportCommentDto,
+  ): Promise<ReportCommentDto> {
+    return this.reportRepository.withTransaction(async (conn) => {
+      const report = await this.reportRepository.findReportForUpdate(reportId, conn);
+      if (!report || report.status !== 'approved') {
+        throw new NotFoundException('Report not available for comments');
+      }
+
+      let parentCommentId: number | null = null;
+      if (dto.parentCommentId) {
+        const parent = await this.reportCommentRepository.findById(dto.parentCommentId, conn);
+        if (!parent || parent.report_id !== reportId || parent.status !== 'visible' || parent.deleted_at) {
+          throw new BadRequestException('Parent comment is not available');
+        }
+        parentCommentId = parent.id;
+      }
+
+      const commentId = await this.reportCommentRepository.insertComment(conn, {
+        reportId,
+        userId: user.userId,
+        parentCommentId,
+        content: dto.content,
+      });
+
+      const comment = await this.reportCommentRepository.findById(commentId, conn);
+      if (!comment) {
+        throw new NotFoundException('Comment not found after creation');
+      }
+
+      this.logger.log(`User ${user.userId} commented on report ${reportId}`);
+
+      return this.mapCommentRecordToDto(comment);
+    });
+  }
+
+  async updateReportComment(
+    reportId: number,
+    commentId: number,
+    user: UserContext,
+    dto: UpdateReportCommentDto,
+  ): Promise<ReportCommentDto> {
+    return this.reportRepository.withTransaction(async (conn) => {
+      const report = await this.reportRepository.findReportForUpdate(reportId, conn);
+      if (!report || report.status !== 'approved') {
+        throw new NotFoundException('Report not available for comments');
+      }
+
+      const existing = await this.reportCommentRepository.findById(commentId, conn);
+      if (!existing || existing.report_id !== reportId || existing.status !== 'visible' || existing.deleted_at) {
+        throw new NotFoundException('Comment not found');
+      }
+
+      if (existing.user_id !== user.userId && user.role !== 'admin') {
+        throw new ForbiddenException('You cannot modify this comment');
+      }
+
+      await this.reportCommentRepository.updateComment(conn, commentId, dto.content);
+
+      const updated = await this.reportCommentRepository.findById(commentId, conn);
+      if (!updated) {
+        throw new NotFoundException('Comment not found after update');
+      }
+
+      this.logger.log(`User ${user.userId} updated comment ${commentId} on report ${reportId}`);
+
+      return this.mapCommentRecordToDto(updated);
+    });
+  }
+
+  async deleteReportComment(
+    reportId: number,
+    commentId: number,
+    user: UserContext,
+  ): Promise<{ success: true }> {
+    return this.reportRepository.withTransaction(async (conn) => {
+      const report = await this.reportRepository.findReportForUpdate(reportId, conn);
+      if (!report || report.status !== 'approved') {
+        throw new NotFoundException('Report not available for comments');
+      }
+
+      const existing = await this.reportCommentRepository.findById(commentId, conn);
+      if (!existing || existing.report_id !== reportId || existing.deleted_at) {
+        throw new NotFoundException('Comment not found');
+      }
+
+      if (existing.user_id !== user.userId && user.role !== 'admin') {
+        throw new ForbiddenException('You cannot delete this comment');
+      }
+
+      await this.reportCommentRepository.softDeleteComment(conn, commentId);
+
+      this.logger.log(`User ${user.userId} deleted comment ${commentId} on report ${reportId}`);
+
+      return { success: true as const };
+    });
+  }
+
+  async getReportComments(
+    reportId: number,
+    query: GetReportCommentsQueryDto,
+  ): Promise<GetReportCommentsResponseDto> {
+    const report = await this.reportRepository.findReportById(reportId);
+    if (!report || report.status !== 'approved') {
+      throw new NotFoundException('Report not available for comments');
+    }
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const offset = (page - 1) * limit;
+
+    const { items, total } = await this.reportCommentRepository.listVisibleComments(reportId, {
+      limit,
+      offset,
+    });
+
+    return {
+      items: items.map((item) => this.mapCommentRecordToDto(item)),
+      meta: {
+        page,
+        limit,
+        total,
+      },
+    };
+  }
+
+  private mapRatingRecordToResponse(
+    record: ReportRatingRecord,
+    summary: { average: number; count: number },
+  ): ReportRatingResponseDto {
+    return {
+      ratingId: record.id,
+      reportId: record.report_id,
+      userId: record.user_id,
+      score: record.score,
+      comment: record.comment,
+      createdAt: record.created_at.toISOString(),
+      updatedAt: record.updated_at.toISOString(),
+      summary: {
+        average: summary.average,
+        count: summary.count,
+      },
+    };
+  }
+
+  private mapCommentRecordToDto(record: ReportCommentRecord): ReportCommentDto {
+    return {
+      commentId: record.id,
+      reportId: record.report_id,
+      userId: record.user_id,
+      parentCommentId: record.parent_comment_id,
+      content: record.content,
+      createdAt: record.created_at.toISOString(),
+      updatedAt: record.updated_at.toISOString(),
+    };
   }
 }
