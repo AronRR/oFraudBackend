@@ -3,10 +3,12 @@
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { UserRole } from 'src/auth/tokens.service';
 import { extractHostFromUrl } from 'src/util/url.util';
-import { ReportRepository, ReportStatus } from './report.repository';
+import { ReportRepository, ReportStatus, type FindApprovedReportsSort } from './report.repository';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { AddMediaDto } from './dto/add-media.dto';
+import { GetReportsQueryDto, ReportsFeedSort } from './dto/get-reports-query.dto';
+import { GetReportsResponseDto } from './dto/get-reports-response.dto';
 import { RejectionReasonRepository } from './rejection-reason.repository';
 
 interface UserContext {
@@ -22,6 +24,47 @@ export class ReportsService {
     private readonly reportRepository: ReportRepository,
     private readonly rejectionReasonRepository: RejectionReasonRepository,
   ) {}
+
+  async getApprovedReports(query: GetReportsQueryDto): Promise<GetReportsResponseDto> {
+    const sortKey = query.sort ?? ReportsFeedSort.RECENT;
+    const sortMap: Record<ReportsFeedSort, FindApprovedReportsSort> = {
+      [ReportsFeedSort.RECENT]: 'recent',
+      [ReportsFeedSort.RATING]: 'rating',
+      [ReportsFeedSort.POPULAR]: 'popular',
+    };
+
+    const { feed, topHosts } = await this.reportRepository.findApprovedReports({
+      categoryId: query.categoryId,
+      host: query.host,
+      search: query.search,
+      sort: sortMap[sortKey],
+    });
+
+    return {
+      feed: feed.map((report) => ({
+        reportId: report.reportId,
+        categoryId: report.categoryId,
+        categoryName: report.categoryName,
+        categorySlug: report.categorySlug,
+        title: report.title,
+        description: report.description,
+        incidentUrl: report.incidentUrl,
+        publisherHost: report.publisherHost,
+        ratingAverage: report.ratingAverage ? Number(report.ratingAverage) : 0,
+        ratingCount: report.ratingCount,
+        publishedAt: report.publishedAt ? new Date(report.publishedAt).toISOString() : null,
+        approvedAt: report.approvedAt ? new Date(report.approvedAt).toISOString() : null,
+      })),
+      insights: {
+        topHosts: topHosts.map((item) => ({
+          host: item.host,
+          reportCount: item.reportCount,
+          averageRating: item.averageRating != null ? Number(item.averageRating) : null,
+          totalRatings: item.totalRatings,
+        })),
+      },
+    };
+  }
 
   async createReport(user: UserContext, dto: CreateReportDto): Promise<{ reportId: number; revisionId: number }> {
     const isAnonymous = dto.isAnonymous ?? false;
