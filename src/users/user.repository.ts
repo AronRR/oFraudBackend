@@ -4,7 +4,7 @@ import { Injectable } from "@nestjs/common";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { DbService } from "src/db/db.service";
 
-export type UserRole = "user" | "admin" | "moderator";
+export type UserRole = "user" | "admin";
 
 export type User = {
     id: number;

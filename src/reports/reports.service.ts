@@ -135,7 +135,7 @@ export class ReportsService {
     rejectionReasonText?: string | null;
     note?: string | null;
   }): Promise<void> {
-    if (admin.role !== 'admin' && admin.role !== 'moderator') {
+    if (admin.role !== 'admin') {
       throw new ForbiddenException('Insufficient permissions');
     }
 
