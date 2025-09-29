@@ -1,7 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
-import { REPORT_FLAG_STATUSES, ReportFlagStatus } from 'src/reports/report-flag.repository';
+import { REPORT_FLAG_STATUSES } from 'src/reports/report-flag.repository';
+import type { ReportFlagStatus } from 'src/reports/report-flag.repository';
 
 export class GetReportFlagsQueryDto {
   @ApiPropertyOptional({ description: 'Filtrar flags por estado', enum: REPORT_FLAG_STATUSES })
@@ -31,3 +32,4 @@ export class GetReportFlagsQueryDto {
   @Max(100)
   limit = 20;
 }
+

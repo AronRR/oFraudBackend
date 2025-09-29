@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { REPORT_FLAG_REASONS, REPORT_FLAG_STATUSES, ReportFlagReason, ReportFlagStatus } from 'src/reports/report-flag.repository';
+import { REPORT_FLAG_REASONS, REPORT_FLAG_STATUSES } from 'src/reports/report-flag.repository';
+import type { ReportFlagReason, ReportFlagStatus } from 'src/reports/report-flag.repository';
 import type { ReportStatus } from 'src/reports/report.repository';
 
 const REPORT_STATUS_VALUES: ReportStatus[] = ['pending', 'approved', 'rejected', 'removed'];
@@ -90,3 +91,4 @@ export class GetReportFlagsResponseDto {
   @ApiProperty({ type: AdminReportFlagCountsDto })
   counts!: AdminReportFlagCountsDto;
 }
+

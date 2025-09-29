@@ -2,7 +2,8 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { RowDataPacket } from 'mysql2';
 import { AdminRepository } from './admin.repository';
 import { ReportRepository } from 'src/reports/report.repository';
-import { ReportFlagRepository, ReportFlagAdminRow } from 'src/reports/report-flag.repository';
+import { ReportFlagRepository } from 'src/reports/report-flag.repository';
+import type { ReportFlagAdminRow, ReportFlagRecord } from 'src/reports/report-flag.repository';
 import { GetAdminReportsQueryDto } from './dto/get-admin-reports-query.dto';
 import { GetAdminReportsResponseDto } from './dto/get-admin-reports-response.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -282,3 +283,4 @@ export class AdminService {
     };
   }
 }
+

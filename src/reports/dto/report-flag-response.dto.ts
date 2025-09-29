@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { REPORT_FLAG_REASONS, REPORT_FLAG_STATUSES, ReportFlagReason, ReportFlagStatus } from '../report-flag.repository';
+import { REPORT_FLAG_REASONS, REPORT_FLAG_STATUSES } from '../report-flag.repository';
+import type { ReportFlagReason, ReportFlagStatus } from '../report-flag.repository';
 
 export class ReportFlagResponseDto {
   @ApiProperty()
@@ -23,3 +24,4 @@ export class ReportFlagResponseDto {
   @ApiProperty({ nullable: true })
   handledAt!: string | null;
 }
+
