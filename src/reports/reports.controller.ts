@@ -16,7 +16,7 @@ export class ReportsController {
   @Post()
   @UseGuards(JwtAuthGuard)
   async createReport(@Req() req: AuthenticatedRequest, @Body() dto: CreateReportDto) {
-    const userId = Number(req.user.profile?.id);
+    const userId = Number(req.user.userId);
     return this.reportsService.createReport({ userId }, dto);
   }
 
@@ -27,7 +27,7 @@ export class ReportsController {
     @Param('id', ParseIntPipe) reportId: number,
     @Body() dto: UpdateReportDto,
   ) {
-    const userId = Number(req.user.profile?.id);
+    const userId = Number(req.user.userId);
     return this.reportsService.updateReport(reportId, { userId }, dto);
   }
 
@@ -38,15 +38,15 @@ export class ReportsController {
     @Param('id', ParseIntPipe) revisionId: number,
     @Body() dto: Omit<AddMediaDto, 'revisionId'>,
   ) {
-    const userId = Number(req.user.profile?.id);
+    const userId = Number(req.user.userId);
     return this.reportsService.addMediaToRevision({ userId }, { ...dto, revisionId });
   }
 
   @Post('moderate')
   @UseGuards(JwtAuthGuard)
   async moderateReport(@Req() req: AuthenticatedRequest, @Body() dto: ModerateReportDto) {
-    const userId = Number(req.user.profile?.id);
-    const role = req.user.raw?.profile?.['role'] ?? 'user';
+    const userId = Number(req.user.userId);
+    const role = req.user.role;
     await this.reportsService.moderateReport(
       { userId, role },
       {
