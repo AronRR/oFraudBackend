@@ -7,7 +7,7 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { CategoryResponseDto } from './dto/category-response.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { BlockUserDto } from './dto/block-user.dto';
-import { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request';
+import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request';
 import { MetricsOverviewDto } from './dto/metrics-overview.dto';
 import { MetricsTopCategoryDto } from './dto/metrics-top-category.dto';
 import { MetricsTopHostDto } from './dto/metrics-top-host.dto';

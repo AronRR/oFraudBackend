@@ -138,7 +138,7 @@ export class AdminRepository {
       return false;
     }
 
-    await this.insertBlockEvent(userId, adminId, 'blocked', reason);
+    await this.insertBlockEvent(userId, adminId, 'blocked', reason ?? null);
     return true;
   }
 
