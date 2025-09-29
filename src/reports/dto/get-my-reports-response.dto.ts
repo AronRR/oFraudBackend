@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 
 import { ApiProperty } from '@nestjs/swagger';
-import { ReportStatus } from '../report.repository';
+import type { ReportStatus } from '../report.repository';
 
 const REPORT_STATUS_VALUES: ReportStatus[] = ['pending', 'approved', 'rejected', 'removed'];
 
