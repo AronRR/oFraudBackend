@@ -22,6 +22,6 @@ export class CreateUserDto {
     @ApiProperty({ example: "password123", description: "Contraseña del usuario" })
     password: string;
 
-    @ApiProperty({ enum: ["user", "admin", "moderator"], required: false, description: "Rol del usuario" })
+    @ApiProperty({ enum: ["user", "admin"], required: false, description: "Rol del usuario" })
     role?: UserRole;
 }
