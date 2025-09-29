@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request';
 import { ReportsService } from './reports.service';
@@ -13,6 +13,13 @@ import { GetReportsQueryDto } from './dto/get-reports-query.dto';
 import { GetReportsResponseDto } from './dto/get-reports-response.dto';
 import { GetMyReportsQueryDto } from './dto/get-my-reports-query.dto';
 import { GetMyReportsResponseDto } from './dto/get-my-reports-response.dto';
+import { CreateReportRatingDto } from './dto/create-report-rating.dto';
+import { UpdateReportRatingDto } from './dto/update-report-rating.dto';
+import { DeleteReportRatingResponseDto, ReportRatingResponseDto } from './dto/report-rating-response.dto';
+import { CreateReportCommentDto } from './dto/create-report-comment.dto';
+import { UpdateReportCommentDto } from './dto/update-report-comment.dto';
+import { GetReportCommentsQueryDto } from './dto/get-report-comments-query.dto';
+import { GetReportCommentsResponseDto, ReportCommentDto } from './dto/get-report-comments-response.dto';
 
 @ApiTags('Reports')
 @Controller('reports')
@@ -95,6 +102,102 @@ export class ReportsController {
   ): Promise<{ success: true }> {
     const userId = Number(req.user.userId);
     await this.reportsService.deleteReport(reportId, { userId });
+    return { success: true };
+  }
+
+  @Get(':id/comments')
+  @ApiOperation({ summary: 'Listar comentarios visibles de un reporte aprobado' })
+  @ApiOkResponse({ type: GetReportCommentsResponseDto })
+  async listReportComments(
+    @Param('id', ParseIntPipe) reportId: number,
+    @Query() query: GetReportCommentsQueryDto,
+  ): Promise<GetReportCommentsResponseDto> {
+    return this.reportsService.getReportComments(reportId, query);
+  }
+
+  @Post(':id/ratings')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Registrar una calificación de 1 a 5 estrellas' })
+  @ApiCreatedResponse({ type: ReportRatingResponseDto })
+  async createReportRating(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) reportId: number,
+    @Body() dto: CreateReportRatingDto,
+  ): Promise<ReportRatingResponseDto> {
+    const userId = Number(req.user.userId);
+    const role = req.user.role;
+    return this.reportsService.createReportRating(reportId, { userId, role }, dto);
+  }
+
+  @Patch(':id/ratings/:ratingId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Actualizar una calificación existente' })
+  @ApiOkResponse({ type: ReportRatingResponseDto })
+  async updateReportRating(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) reportId: number,
+    @Param('ratingId', ParseIntPipe) ratingId: number,
+    @Body() dto: UpdateReportRatingDto,
+  ): Promise<ReportRatingResponseDto> {
+    const userId = Number(req.user.userId);
+    const role = req.user.role;
+    return this.reportsService.updateReportRating(reportId, ratingId, { userId, role }, dto);
+  }
+
+  @Delete(':id/ratings/:ratingId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Eliminar una calificación propia o moderada' })
+  @ApiOkResponse({ type: DeleteReportRatingResponseDto })
+  async deleteReportRating(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) reportId: number,
+    @Param('ratingId', ParseIntPipe) ratingId: number,
+  ): Promise<DeleteReportRatingResponseDto> {
+    const userId = Number(req.user.userId);
+    const role = req.user.role;
+    return this.reportsService.deleteReportRating(reportId, ratingId, { userId, role });
+  }
+
+  @Post(':id/comments')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Publicar un comentario sobre un reporte aprobado' })
+  @ApiCreatedResponse({ type: ReportCommentDto })
+  async createReportComment(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) reportId: number,
+    @Body() dto: CreateReportCommentDto,
+  ): Promise<ReportCommentDto> {
+    const userId = Number(req.user.userId);
+    const role = req.user.role;
+    return this.reportsService.createReportComment(reportId, { userId, role }, dto);
+  }
+
+  @Patch(':id/comments/:commentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Actualizar un comentario existente' })
+  @ApiOkResponse({ type: ReportCommentDto })
+  async updateReportComment(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) reportId: number,
+    @Param('commentId', ParseIntPipe) commentId: number,
+    @Body() dto: UpdateReportCommentDto,
+  ): Promise<ReportCommentDto> {
+    const userId = Number(req.user.userId);
+    const role = req.user.role;
+    return this.reportsService.updateReportComment(reportId, commentId, { userId, role }, dto);
+  }
+
+  @Delete(':id/comments/:commentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Eliminar un comentario propio o moderado' })
+  async deleteReportComment(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) reportId: number,
+    @Param('commentId', ParseIntPipe) commentId: number,
+  ): Promise<{ success: true }> {
+    const userId = Number(req.user.userId);
+    const role = req.user.role;
+    await this.reportsService.deleteReportComment(reportId, commentId, { userId, role });
     return { success: true };
   }
 }
