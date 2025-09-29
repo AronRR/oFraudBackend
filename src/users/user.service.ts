@@ -1,6 +1,6 @@
 /* eslint-disable prettier/prettier */
 
-import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { User, UserRepository } from "./user.repository";
@@ -35,6 +35,12 @@ export class UserService {
     async login(email: string, password: string): Promise<User> {
         const user = await this.userRepository.findByEmail(email);
         if (!user) throw Error("Usuario no encontrado");
+
+        if (this.isUserBlocked(user)) {
+            await this.recordBlockedLoginAttempt(user);
+            throw new ForbiddenException(user.blocked_reason ?? "La cuenta está bloqueada");
+        }
+
         let isPasswordValid = false;
         try {
             isPasswordValid = await bcrypt.compare(password, user.password_hash);
@@ -58,5 +64,22 @@ export class UserService {
             "code" in error &&
             (error as { code?: string }).code === "ER_DUP_ENTRY"
         );
+    }
+
+    private isUserBlocked(user: User): boolean {
+        return user.is_blocked === true || user.is_blocked === 1;
+    }
+
+    private async recordBlockedLoginAttempt(user: User): Promise<void> {
+        if (!user.blocked_by) return;
+        try {
+            await this.userRepository.recordBlockedLoginAttempt(
+                user.id,
+                user.blocked_by,
+                user.blocked_reason ?? null,
+            );
+        } catch {
+            // La auditoría no debe impedir la respuesta al usuario.
+        }
     }
 }

@@ -69,7 +69,8 @@
     ],
     "rootDir": "src",
     "moduleNameMapper": {
-      "^src/(.*)$": "<rootDir>/$1"
+      "^src/(.*)$": "<rootDir>/$1",
+      "^bcrypt$": "<rootDir>/../test/mocks/bcrypt.ts"
     },
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
