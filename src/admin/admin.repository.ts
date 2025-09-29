@@ -228,14 +228,34 @@ export class AdminRepository {
   async getTopHosts(limit: number): Promise<RowDataPacket[]> {
     const sql = `
       SELECT
-        rr.publisher_host AS host,
-        COUNT(*) AS reportsCount,
-        SUM(r.status = 'approved') AS approvedReportsCount
-      FROM reports r
-      INNER JOIN report_revisions rr ON rr.id = r.current_revision_id
-      WHERE rr.publisher_host IS NOT NULL AND rr.publisher_host <> ''
-      GROUP BY rr.publisher_host
-      ORDER BY reportsCount DESC, approvedReportsCount DESC
+        approved.host,
+        COALESCE(totals.totalReportsCount, 0) AS reportsCount,
+        approved.approvedReportsCount,
+        COALESCE(totals.pendingReportsCount, 0) AS pendingReportsCount,
+        COALESCE(totals.rejectedReportsCount, 0) AS rejectedReportsCount,
+        COALESCE(totals.removedReportsCount, 0) AS removedReportsCount
+      FROM (
+        SELECT
+          rr.publisher_host AS host,
+          COUNT(*) AS approvedReportsCount
+        FROM reports r
+        INNER JOIN report_revisions rr ON rr.id = r.current_revision_id
+        WHERE r.status = 'approved' AND rr.publisher_host IS NOT NULL AND rr.publisher_host <> ''
+        GROUP BY rr.publisher_host
+      ) AS approved
+      LEFT JOIN (
+        SELECT
+          rr.publisher_host AS host,
+          COUNT(*) AS totalReportsCount,
+          SUM(r.status = 'pending') AS pendingReportsCount,
+          SUM(r.status = 'rejected') AS rejectedReportsCount,
+          SUM(r.status = 'removed') AS removedReportsCount
+        FROM reports r
+        INNER JOIN report_revisions rr ON rr.id = r.current_revision_id
+        WHERE rr.publisher_host IS NOT NULL AND rr.publisher_host <> ''
+        GROUP BY rr.publisher_host
+      ) AS totals ON totals.host = approved.host
+      ORDER BY approved.approvedReportsCount DESC, COALESCE(totals.totalReportsCount, 0) DESC
       LIMIT ?
     `;
 
