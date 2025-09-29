@@ -41,6 +41,31 @@ export interface ReportRevisionRecord {
   created_at: Date;
 }
 
+export type FindApprovedReportsSort = 'recent' | 'rating' | 'popular';
+
+export interface ApprovedReportWithRevision {
+  reportId: number;
+  categoryId: number;
+  categoryName: string | null;
+  categorySlug: string | null;
+  ratingAverage: string;
+  ratingCount: number;
+  publishedAt: Date | null;
+  approvedAt: Date | null;
+  createdAt: Date;
+  title: string | null;
+  description: string;
+  incidentUrl: string;
+  publisherHost: string;
+}
+
+export interface TopHostInsightRow {
+  host: string;
+  reportCount: number;
+  averageRating: string | null;
+  totalRatings: number;
+}
+
 @Injectable()
 export class ReportRepository {
   constructor(private readonly dbService: DbService) {}
@@ -259,5 +284,142 @@ export class ReportRepository {
 
   async softDeleteMediaByRevision(conn: PoolConnection, revisionId: number): Promise<void> {
     await conn.query('UPDATE report_media SET deleted_at = NOW() WHERE revision_id = ?', [revisionId]);
+  }
+
+  async findApprovedReports(filters: {
+    categoryId?: number;
+    host?: string;
+    search?: string;
+    sort?: FindApprovedReportsSort;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ feed: ApprovedReportWithRevision[]; topHosts: TopHostInsightRow[] }> {
+    const {
+      categoryId,
+      host,
+      search,
+      sort = 'recent',
+      limit = 20,
+      offset = 0,
+    } = filters;
+
+    const baseConditions: string[] = ["r.status = 'approved'", 'r.deleted_at IS NULL'];
+    const feedConditions = [...baseConditions];
+    const feedParams: Array<number | string> = [];
+
+    if (categoryId) {
+      feedConditions.push('r.category_id = ?');
+      feedParams.push(categoryId);
+    }
+
+    if (host) {
+      feedConditions.push('rr.publisher_host = ?');
+      feedParams.push(host);
+    }
+
+    if (search) {
+      const term = `%${search}%`;
+      feedConditions.push('(rr.title LIKE ? OR rr.description LIKE ? OR rr.publisher_host LIKE ?)');
+      feedParams.push(term, term, term);
+    }
+
+    let orderClause = 'r.published_at DESC, r.approved_at DESC, r.created_at DESC';
+    if (sort === 'rating') {
+      orderClause = 'r.rating_average DESC, r.rating_count DESC, r.published_at DESC';
+    } else if (sort === 'popular') {
+      orderClause = 'r.rating_count DESC, r.rating_average DESC, r.published_at DESC';
+    }
+
+    const feedQuery = `
+      SELECT
+        r.id AS report_id,
+        r.category_id,
+        c.name AS category_name,
+        c.slug AS category_slug,
+        r.rating_average,
+        r.rating_count,
+        r.published_at,
+        r.approved_at,
+        r.created_at,
+        rr.title,
+        rr.description,
+        rr.incident_url,
+        rr.publisher_host
+      FROM reports r
+      INNER JOIN report_revisions rr ON rr.id = r.current_revision_id
+      LEFT JOIN categories c ON c.id = r.category_id
+      WHERE ${feedConditions.join(' AND ')}
+      ORDER BY ${orderClause}
+      LIMIT ? OFFSET ?
+    `;
+
+    const feedResultParams = [...feedParams, limit, offset];
+    const [feedRows] = await this.dbService
+      .getPool()
+      .query<RowDataPacket[]>(feedQuery, feedResultParams);
+
+    const insightsConditions = [...baseConditions];
+    const insightsParams: Array<number | string> = [];
+
+    if (categoryId) {
+      insightsConditions.push('r.category_id = ?');
+      insightsParams.push(categoryId);
+    }
+
+    if (host) {
+      insightsConditions.push('rr.publisher_host = ?');
+      insightsParams.push(host);
+    }
+
+    if (search) {
+      const term = `%${search}%`;
+      insightsConditions.push('(rr.title LIKE ? OR rr.description LIKE ? OR rr.publisher_host LIKE ?)');
+      insightsParams.push(term, term, term);
+    }
+
+    const insightsQuery = `
+      SELECT
+        rr.publisher_host AS host,
+        COUNT(*) AS report_count,
+        AVG(r.rating_average) AS average_rating,
+        SUM(r.rating_count) AS total_ratings
+      FROM reports r
+      INNER JOIN report_revisions rr ON rr.id = r.current_revision_id
+      WHERE ${insightsConditions.join(' AND ')}
+      GROUP BY rr.publisher_host
+      HAVING rr.publisher_host <> ''
+      ORDER BY report_count DESC, average_rating DESC
+      LIMIT 5
+    `;
+
+    const [insightRows] = await this.dbService
+      .getPool()
+      .query<RowDataPacket[]>(insightsQuery, insightsParams);
+
+    return {
+      feed: feedRows.map((row) => ({
+        reportId: row.report_id as number,
+        categoryId: row.category_id as number,
+        categoryName: (row.category_name as string | null) ?? null,
+        categorySlug: (row.category_slug as string | null) ?? null,
+        ratingAverage: row.rating_average as string,
+        ratingCount: Number(row.rating_count),
+        publishedAt: (row.published_at as Date | null) ?? null,
+        approvedAt: (row.approved_at as Date | null) ?? null,
+        createdAt: row.created_at as Date,
+        title: (row.title as string | null) ?? null,
+        description: row.description as string,
+        incidentUrl: row.incident_url as string,
+        publisherHost: row.publisher_host as string,
+      })),
+      topHosts: (insightRows as unknown as Array<{ host: string; report_count: number; average_rating: string | null; total_ratings: number }>).map(
+        (row) => ({
+          host: row.host,
+          reportCount: Number(row.report_count),
+          averageRating: row.average_rating,
+          totalRatings: Number(row.total_ratings ?? 0),
+        }),
+      ),
+    };
   }
 }
