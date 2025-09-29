@@ -21,6 +21,8 @@ import { CreateReportCommentDto } from './dto/create-report-comment.dto';
 import { UpdateReportCommentDto } from './dto/update-report-comment.dto';
 import { GetReportCommentsQueryDto } from './dto/get-report-comments-query.dto';
 import { GetReportCommentsResponseDto, ReportCommentDto } from './dto/get-report-comments-response.dto';
+import { CreateReportFlagDto } from './dto/create-report-flag.dto';
+import { ReportFlagResponseDto } from './dto/report-flag-response.dto';
 
 @ApiTags('Reports')
 @Controller('reports')
@@ -158,6 +160,19 @@ export class ReportsController {
     const userId = Number(req.user.userId);
     const role = req.user.role;
     return this.reportsService.deleteReportRating(reportId, ratingId, { userId, role });
+  }
+
+  @Post(':id/flags')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Reportar un reporte aprobado para moderación' })
+  @ApiCreatedResponse({ type: ReportFlagResponseDto })
+  async createReportFlag(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) reportId: number,
+    @Body() dto: CreateReportFlagDto,
+  ): Promise<ReportFlagResponseDto> {
+    const userId = Number(req.user.userId);
+    return this.reportsService.createReportFlag(reportId, { userId }, dto);
   }
 
   @Post(':id/comments')

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -14,6 +14,11 @@ import { MetricsTopHostDto } from './dto/metrics-top-host.dto';
 import { GetAdminReportsQueryDto } from './dto/get-admin-reports-query.dto';
 import { GetAdminReportsResponseDto } from './dto/get-admin-reports-response.dto';
 
+import { GetReportFlagsQueryDto } from './dto/get-report-flags-query.dto';
+import { GetReportFlagsResponseDto } from './dto/get-report-flags-response.dto';
+import { ResolveReportFlagDto } from './dto/resolve-report-flag.dto';
+import { ReportFlagResponseDto } from 'src/reports/dto/report-flag-response.dto';
+
 @ApiTags('Admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, AdminRoleGuard)
@@ -26,6 +31,25 @@ export class AdminController {
   @ApiOkResponse({ type: GetAdminReportsResponseDto })
   async listReports(@Query() query: GetAdminReportsQueryDto): Promise<GetAdminReportsResponseDto> {
     return this.adminService.listReports(query);
+  }
+
+  @Get('report-flags')
+  @ApiOperation({ summary: 'Listar flags de reportes para revisión' })
+  @ApiOkResponse({ type: GetReportFlagsResponseDto })
+  async listReportFlags(@Query() query: GetReportFlagsQueryDto): Promise<GetReportFlagsResponseDto> {
+    return this.adminService.listReportFlags(query);
+  }
+
+  @Patch('report-flags/:id')
+  @ApiOperation({ summary: 'Resolver un flag de reporte' })
+  @ApiOkResponse({ type: ReportFlagResponseDto })
+  async resolveReportFlag(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ResolveReportFlagDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ReportFlagResponseDto> {
+    const adminId = Number(req.user.userId);
+    return this.adminService.resolveReportFlag(id, adminId, dto);
   }
 
   @Get('categories')

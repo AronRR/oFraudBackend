@@ -36,6 +36,31 @@ Table user_block_events {
   created_at datetime [not null, default: `CURRENT_TIMESTAMP`]
 }
 
+Table user_profile_audit {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  field varchar(64) [not null]
+  old_value varchar(255)
+  new_value varchar(255)
+  created_at datetime [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (user_id, created_at)
+    (field, created_at)
+  }
+}
+
+Table user_security_audit {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  action varchar(50) [not null]
+  metadata json
+  created_at datetime [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (user_id, action, created_at)
+  }
+}
+
+
 Table auth_refresh_tokens {
   id bigint [pk, increment]
   user_id bigint [not null]
@@ -903,7 +928,7 @@ Additional entity classes follow the same pattern and can be expanded as the imp
 - `report_revisions` stores a full-text index for title/description search, aiding in fraud pattern discovery.
 - `report_media` enforces ordering per revision with a unique index (`revision_id`, `position`).
 - `report_ratings` and `report_flags` rely on unique tuples to prevent duplicate submissions per user.
-- Audit tables (`user_block_events`, `report_status_history`) retain chronological ordering via indexes on `(entity_id, created_at)`.
+- Audit tables (`user_block_events`, `user_profile_audit`, `user_security_audit`, `report_status_history`) retain chronological ordering via indexes on `(user_id, created_at)` or `(entity_id, created_at)` depending on the context.
 - `category_search_logs` indexes category, user, and timestamp columns so product analytics can aggregate trends efficiently.
 
 This document will continue to evolve alongside new product decisions, but it should serve as the baseline schema for implementing Ofraud with NestJS and TypeORM.
@@ -911,7 +936,7 @@ This document will continue to evolve alongside new product decisions, but it sh
 ## Professional Assessment
 
 - **Solidez relacional:** el modelo garantiza integridad referencial estricta entre usuarios, reportes y sus entidades sat茅lite. Los `ON DELETE`/`ON UPDATE` definidos evitan datos hu茅rfanos y permiten conservar auditor铆a hist贸rica sin sacrificar consistencia.
-- **Moderaci贸n trazable:** las tablas `report_status_history`, `report_flags` y `user_block_events` ofrecen un rastro completo de decisiones administrativas, lo cual facilita revisiones posteriores y m茅tricas de cumplimiento.
+- **Moderaci髇 trazable:** las tablas `report_status_history`, `report_flags`, `user_block_events`, `user_profile_audit` y `user_security_audit` ofrecen un rastro completo de decisiones administrativas, lo cual facilita revisiones posteriores y m閠ricas de cumplimiento.
 - **Flexibilidad para iterar:** el uso de `report_revisions` y `report_media` desacopla el contenido din谩mico de un reporte de su estado moderado, permitiendo ediciones controladas y versiones publicadas claramente identificadas.
 - **Escalabilidad de consultas:** los 铆ndices compuestos en colas de revisi贸n, filtros por categor铆a y contadores en `categories` ofrecen una base s贸lida para dashboards y listados sin requerir desnormalizaci贸n temprana.
 - **Aspectos a vigilar:** al crecer el volumen de archivos y revisiones se recomienda evaluar almacenamiento externo para `report_media` y tareas de limpieza programada sobre `auth_refresh_tokens`/`user_password_resets` para mantener la base ligera.

@@ -3,6 +3,8 @@
 import { Injectable } from "@nestjs/common";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { DbService } from "src/db/db.service";
+import { UserProfileAuditRepository, UserProfileAuditChange } from "./audit/user-profile-audit.repository";
+import { UserSecurityAuditRepository } from "./audit/user-security-audit.repository";
 
 export type UserRole = "user" | "admin";
 
@@ -45,7 +47,12 @@ export type UpdateUserProfileRecord = Partial<
 
 @Injectable()
 export class UserRepository {
-    constructor(private readonly dbService: DbService) {}
+    constructor(
+        private readonly dbService: DbService,
+        private readonly userProfileAuditRepository: UserProfileAuditRepository,
+        private readonly userSecurityAuditRepository: UserSecurityAuditRepository,
+    ) {}
+
 
     async registerUser(data: CreateUserRecord): Promise<User> {
         const insertSql =
@@ -106,7 +113,7 @@ export class UserRepository {
 
         const fields: string[] = [];
         const values: (string | null)[] = [];
-        const changes: { field: string; oldValue: string | null; newValue: string | null }[] = [];
+        const changes: UserProfileAuditChange[] = [];
 
         const applyChange = (
             column: keyof UpdateUserProfileRecord,
@@ -135,7 +142,7 @@ export class UserRepository {
         const pool = this.dbService.getPool();
         await pool.execute<ResultSetHeader>(sql, [...values, userId]);
 
-        await this.recordProfileAudit(userId, changes);
+        await this.userProfileAuditRepository.recordChanges(userId, changes);
 
         return this.findById(userId);
     }
@@ -145,36 +152,6 @@ export class UserRepository {
             "UPDATE users SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
         const pool = this.dbService.getPool();
         await pool.execute<ResultSetHeader>(sql, [passwordHash, passwordSalt, userId]);
-        await this.recordPasswordAudit(userId);
-    }
-
-    private async recordProfileAudit(
-        userId: number,
-        changes: { field: string; oldValue: string | null; newValue: string | null }[],
-    ): Promise<void> {
-        if (changes.length === 0) {
-            return;
-        }
-
-        const sql =
-            "INSERT INTO user_profile_audit (user_id, field, old_value, new_value) VALUES (?, ?, ?, ?)";
-        const pool = this.dbService.getPool();
-        for (const change of changes) {
-            try {
-                await pool.execute(sql, [userId, change.field, change.oldValue, change.newValue]);
-            } catch {
-                // El fallo en la auditoría no debe afectar la operación principal.
-            }
-        }
-    }
-
-    private async recordPasswordAudit(userId: number): Promise<void> {
-        const sql =
-            "INSERT INTO user_security_audit (user_id, action) VALUES (?, 'password_changed')";
-        try {
-            await this.dbService.getPool().execute(sql, [userId]);
-        } catch {
-            // La auditoría es opcional y no debe bloquear la actualización.
-        }
+        await this.userSecurityAuditRepository.recordPasswordChange(userId);
     }
 }

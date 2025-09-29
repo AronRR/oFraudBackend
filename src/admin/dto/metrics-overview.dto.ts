@@ -15,4 +15,16 @@ export class MetricsOverviewDto {
 
   @ApiProperty({ description: 'Reportes pendientes de revisión' })
   pendingReports!: number;
+
+  @ApiProperty({ description: 'Total de flags generados por la comunidad' })
+  totalFlags!: number;
+
+  @ApiProperty({ description: 'Flags pendientes por revisar' })
+  pendingFlags!: number;
+
+  @ApiProperty({ description: 'Flags confirmados como válidos' })
+  validatedFlags!: number;
+
+  @ApiProperty({ description: 'Flags descartados' })
+  dismissedFlags!: number;
 }

@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { RowDataPacket } from 'mysql2';
 import { AdminRepository } from './admin.repository';
 import { ReportRepository } from 'src/reports/report.repository';
+import { ReportFlagRepository, ReportFlagAdminRow } from 'src/reports/report-flag.repository';
 import { GetAdminReportsQueryDto } from './dto/get-admin-reports-query.dto';
 import { GetAdminReportsResponseDto } from './dto/get-admin-reports-response.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -12,11 +13,17 @@ import { MetricsOverviewDto } from './dto/metrics-overview.dto';
 import { MetricsTopCategoryDto } from './dto/metrics-top-category.dto';
 import { MetricsTopHostDto } from './dto/metrics-top-host.dto';
 
+import { GetReportFlagsQueryDto } from './dto/get-report-flags-query.dto';
+import { GetReportFlagsResponseDto, AdminReportFlagItemDto } from './dto/get-report-flags-response.dto';
+import { ResolveReportFlagDto } from './dto/resolve-report-flag.dto';
+import { ReportFlagResponseDto } from 'src/reports/dto/report-flag-response.dto';
+
 @Injectable()
 export class AdminService {
   constructor(
     private readonly adminRepository: AdminRepository,
     private readonly reportRepository: ReportRepository,
+    private readonly reportFlagRepository: ReportFlagRepository,
   ) {}
 
   async listReports(query: GetAdminReportsQueryDto): Promise<GetAdminReportsResponseDto> {
@@ -61,6 +68,60 @@ export class AdminService {
         total,
       },
     };
+  }
+
+  async listReportFlags(query: GetReportFlagsQueryDto): Promise<GetReportFlagsResponseDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const offset = (page - 1) * limit;
+
+    const { items, total } = await this.reportFlagRepository.listFlags({
+      status: query.status,
+      reportId: query.reportId,
+      limit,
+      offset,
+    });
+
+    const counts = await this.reportFlagRepository.getCountsByStatus();
+
+    return {
+      items: items.map((item) => this.mapReportFlagRow(item)),
+      meta: {
+        page,
+        limit,
+        total,
+      },
+      counts: {
+        pending: counts.pending ?? 0,
+        validated: counts.validated ?? 0,
+        dismissed: counts.dismissed ?? 0,
+      },
+    };
+  }
+
+  async resolveReportFlag(flagId: number, adminId: number, dto: ResolveReportFlagDto): Promise<ReportFlagResponseDto> {
+    return this.reportRepository.withTransaction(async (conn) => {
+      const existing = await this.reportFlagRepository.findById(flagId, conn);
+      if (!existing) {
+        throw new NotFoundException('Flag no encontrado');
+      }
+
+      if (existing.status === dto.status) {
+        throw new BadRequestException('El flag ya se encuentra en este estado');
+      }
+
+      await this.reportFlagRepository.updateFlagStatus(conn, flagId, {
+        status: dto.status,
+        handledBy: adminId,
+      });
+
+      const updated = await this.reportFlagRepository.findById(flagId, conn);
+      if (!updated) {
+        throw new NotFoundException('Flag no encontrado luego de actualizar');
+      }
+
+      return this.mapFlagRecordToResponse(updated);
+    });
   }
 
   async removeReport(reportId: number, adminId: number): Promise<void> {
@@ -140,6 +201,10 @@ export class AdminService {
       totalReports: Number(totals.totalReports ?? 0),
       approvedReports: Number(totals.approvedReports ?? 0),
       pendingReports: Number(totals.pendingReports ?? 0),
+      totalFlags: Number(totals.totalFlags ?? 0),
+      pendingFlags: Number(totals.pendingFlags ?? 0),
+      validatedFlags: Number(totals.validatedFlags ?? 0),
+      dismissedFlags: Number(totals.dismissedFlags ?? 0),
     };
   }
 
@@ -164,6 +229,43 @@ export class AdminService {
       rejectedReportsCount: Number(row.rejectedReportsCount ?? 0),
       removedReportsCount: Number(row.removedReportsCount ?? 0),
     }));
+  }
+
+  private mapReportFlagRow(row: ReportFlagAdminRow): AdminReportFlagItemDto {
+    return {
+      flagId: row.flagId,
+      reportId: row.reportId,
+      reportTitle: row.reportTitle,
+      reportStatus: row.reportStatus,
+      reasonCode: row.reasonCode,
+      details: row.details ?? null,
+      status: row.status,
+      createdAt: row.createdAt.toISOString(),
+      handledAt: row.handledAt ? row.handledAt.toISOString() : null,
+      reporter: {
+        id: row.reporter.id,
+        email: row.reporter.email ?? null,
+        name: row.reporter.name ?? null,
+      },
+      handler: row.handler
+        ? {
+            id: row.handler.id,
+            name: row.handler.name ?? null,
+          }
+        : null,
+    };
+  }
+
+  private mapFlagRecordToResponse(record: ReportFlagRecord): ReportFlagResponseDto {
+    return {
+      flagId: record.id,
+      reportId: record.report_id,
+      status: record.status,
+      reasonCode: record.reason_code,
+      details: record.details ?? null,
+      createdAt: record.created_at.toISOString(),
+      handledAt: record.handled_at ? record.handled_at.toISOString() : null,
+    };
   }
 
   private mapCategory(row: RowDataPacket): CategoryResponseDto {

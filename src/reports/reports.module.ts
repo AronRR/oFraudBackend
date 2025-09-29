@@ -7,6 +7,7 @@ import { RejectionReasonRepository } from './rejection-reason.repository';
 import { RejectionReasonSeeder } from './rejection-reason.seeder';
 import { ReportRatingRepository } from './report-rating.repository';
 import { ReportCommentRepository } from './report-comment.repository';
+import { ReportFlagRepository } from './report-flag.repository';
 
 @Module({
   imports: [AuthModule],
@@ -18,6 +19,7 @@ import { ReportCommentRepository } from './report-comment.repository';
     RejectionReasonSeeder,
     ReportRatingRepository,
     ReportCommentRepository,
+    ReportFlagRepository,
   ],
   exports: [ReportsService],
 })

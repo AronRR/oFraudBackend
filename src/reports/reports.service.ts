@@ -1,11 +1,12 @@
 /* eslint-disable prettier/prettier */
 
-import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import type { UserRole } from 'src/auth/tokens.service';
 import { extractHostFromUrl } from 'src/util/url.util';
 import { ReportRepository, ReportStatus, type FindApprovedReportsSort } from './report.repository';
 import { ReportRatingRepository, type ReportRatingRecord } from './report-rating.repository';
 import { ReportCommentRepository, type ReportCommentRecord } from './report-comment.repository';
+import { ReportFlagRepository, type ReportFlagRecord } from './report-flag.repository';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { AddMediaDto } from './dto/add-media.dto';
@@ -21,6 +22,8 @@ import { CreateReportCommentDto } from './dto/create-report-comment.dto';
 import { UpdateReportCommentDto } from './dto/update-report-comment.dto';
 import { GetReportCommentsQueryDto } from './dto/get-report-comments-query.dto';
 import { GetReportCommentsResponseDto, ReportCommentDto } from './dto/get-report-comments-response.dto';
+import { CreateReportFlagDto } from './dto/create-report-flag.dto';
+import { ReportFlagResponseDto } from './dto/report-flag-response.dto';
 
 interface UserContext {
   userId: number;
@@ -37,6 +40,7 @@ export class ReportsService {
     private readonly rejectionReasonRepository: RejectionReasonRepository,
     private readonly reportRatingRepository: ReportRatingRepository,
     private readonly reportCommentRepository: ReportCommentRepository,
+    private readonly reportFlagRepository: ReportFlagRepository,
   ) {}
 
   async getApprovedReports(query: GetReportsQueryDto): Promise<GetReportsResponseDto> {
@@ -441,6 +445,50 @@ export class ReportsService {
     });
   }
 
+  async createReportFlag(
+    reportId: number,
+    user: UserContext,
+    dto: CreateReportFlagDto,
+  ): Promise<ReportFlagResponseDto> {
+    const report = await this.reportRepository.findReportById(reportId);
+    if (!report || report.status !== 'approved') {
+      throw new NotFoundException('Report not available for community flags');
+    }
+
+    const detailsRaw = dto.details ? dto.details.trim() : null;
+    const sanitizedDetails = detailsRaw && detailsRaw.length > 0 ? detailsRaw : null;
+
+    const existing = await this.reportFlagRepository.findByUnique(reportId, user.userId, dto.reasonCode);
+    if (existing) {
+      throw new ConflictException('Ya registraste una alerta con este motivo para este reporte');
+    }
+
+    try {
+      return await this.reportRepository.withTransaction(async (conn) => {
+        const flagId = await this.reportFlagRepository.insertFlag(conn, {
+          reportId,
+          userId: user.userId,
+          reason: dto.reasonCode,
+          details: sanitizedDetails,
+        });
+
+        const record = await this.reportFlagRepository.findById(flagId, conn);
+        if (!record) {
+          throw new NotFoundException('Flag not found after creation');
+        }
+
+        this.logger.log('User ' + user.userId + ' flagged report ' + reportId + ' reason ' + dto.reasonCode);
+
+        return this.mapFlagRecordToResponse(record);
+      });
+    } catch (error) {
+      if (this.isDuplicateEntryError(error)) {
+        throw new ConflictException('Ya registraste una alerta con este motivo para este reporte');
+      }
+      throw error;
+    }
+  }
+
   async createReportComment(
     reportId: number,
     user: UserContext,
@@ -567,6 +615,27 @@ export class ReportsService {
         total,
       },
     };
+  }
+
+  private mapFlagRecordToResponse(record: ReportFlagRecord): ReportFlagResponseDto {
+    return {
+      flagId: record.id,
+      reportId: record.report_id,
+      status: record.status,
+      reasonCode: record.reason_code,
+      details: record.details ?? null,
+      createdAt: record.created_at.toISOString(),
+      handledAt: record.handled_at ? record.handled_at.toISOString() : null,
+    };
+  }
+
+  private isDuplicateEntryError(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'ER_DUP_ENTRY'
+    );
   }
 
   private mapRatingRecordToResponse(
