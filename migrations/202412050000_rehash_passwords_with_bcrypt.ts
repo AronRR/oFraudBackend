@@ -3,16 +3,16 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as bcrypt from "bcrypt";
 import { createHash } from "crypto";
-import mysql from "mysql2/promise";
+import mysql, { type RowDataPacket } from "mysql2/promise";
 
 type LegacyPasswordDump = Record<string, string>;
 
-type UserRow = {
+interface UserRow extends RowDataPacket {
     id: number;
     email: string;
     password_hash: string;
     password_salt: string;
-};
+}
 
 async function loadLegacyPasswords(): Promise<LegacyPasswordDump> {
     const dumpPath = process.env.LEGACY_PASSWORDS_PATH;
