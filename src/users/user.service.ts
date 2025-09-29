@@ -1,8 +1,7 @@
 /* eslint-disable prettier/prettier */
 
 import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
-import { randomBytes } from "crypto";
-import { sha256 } from "src/util/crypto/hash.util";
+import * as bcrypt from "bcrypt";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { User, UserRepository } from "./user.repository";
 
@@ -11,8 +10,8 @@ export class UserService {
     constructor(private readonly userRepository: UserRepository) {}
 
     async registerUser(createUserDto: CreateUserDto): Promise<User> {
-        const salt = randomBytes(16).toString("hex");
-        const hashedPassword = sha256(`${createUserDto.password}${salt}`);
+        const salt = await bcrypt.genSalt();
+        const hashedPassword = await bcrypt.hash(createUserDto.password, salt);
 
         try {
             return await this.userRepository.registerUser({
@@ -36,7 +35,13 @@ export class UserService {
     async login(email: string, password: string): Promise<User> {
         const user = await this.userRepository.findByEmail(email);
         if (!user) throw Error("Usuario no encontrado");
-        if (user.password_hash !== sha256(`${password}${user.password_salt}`)) {
+        let isPasswordValid = false;
+        try {
+            isPasswordValid = await bcrypt.compare(password, user.password_hash);
+        } catch (error) {
+            isPasswordValid = false;
+        }
+        if (!isPasswordValid) {
             throw new UnauthorizedException("Contraseña incorrecta");
         }
         return user;
