@@ -199,12 +199,27 @@ export class AdminRepository {
     `,
     );
 
-    const totals = { ...userCounts[0], ...reportCounts[0] } as unknown as {
+    const [flagCounts] = await pool.query<RowDataPacket[]>(
+      `
+      SELECT
+        COUNT(*) AS totalFlags,
+        COALESCE(SUM(status = 'pending'), 0) AS pendingFlags,
+        COALESCE(SUM(status = 'validated'), 0) AS validatedFlags,
+        COALESCE(SUM(status = 'dismissed'), 0) AS dismissedFlags
+      FROM report_flags
+    `,
+    );
+
+    const totals = { ...userCounts[0], ...reportCounts[0], ...flagCounts[0] } as unknown as {
       totalUsers: number;
       blockedUsers: number;
       totalReports: number;
       approvedReports: number;
       pendingReports: number;
+      totalFlags: number;
+      pendingFlags: number;
+      validatedFlags: number;
+      dismissedFlags: number;
     };
 
     return totals;

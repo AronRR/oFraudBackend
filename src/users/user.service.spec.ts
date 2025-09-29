@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { CreateUserDto } from "./dto/create-user.dto";
+import { toUserResponseDto } from "./dto/user-response.dto";
 import { UserService } from "./user.service";
 
 type MockUserRepository = {
@@ -94,8 +95,22 @@ describe("UserService", () => {
 
             const created = await service.registerUser(createUserDto);
 
-            expect(created.password_salt).toHaveLength(29);
-            expect(created.password_hash).toHaveLength(60);
+            const responseDto = toUserResponseDto(created);
+            expect(responseDto).toEqual({
+                id: baseUser.id,
+                email: createUserDto.email,
+                username: createUserDto.username,
+                firstName: createUserDto.firstName,
+                lastName: createUserDto.lastName,
+                phoneNumber: createUserDto.phoneNumber ?? null,
+                role: createUserDto.role ?? "user",
+                isBlocked: false,
+                blockedReason: null,
+                blockedBy: null,
+                blockedAt: null,
+            });
+            expect((responseDto as unknown as Record<string, unknown>).password_hash).toBeUndefined();
+            expect((responseDto as unknown as Record<string, unknown>).password_salt).toBeUndefined();
             expect(userRepository.registerUser).toHaveBeenCalledWith(
                 expect.objectContaining({
                     email: createUserDto.email,
@@ -176,3 +191,4 @@ describe("UserService", () => {
         });
     });
 });
+

@@ -7,7 +7,7 @@ import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserPasswordDto } from "./dto/update-user-password.dto";
 import { UpdateUserProfileDto } from "./dto/update-user-profile.dto";
-import { User } from "./user.repository";
+import { UserResponseDto, toUserResponseDto } from "./dto/user-response.dto";
 import { UserService } from "./user.service";
 
 @ApiTags("Endpoints de Usuarios")
@@ -16,34 +16,38 @@ export class UserController {
     constructor(private readonly userService: UserService) {}
 
     @Post()
-    @ApiResponse({ status: 201, description: "Usuario creado exitosamente" })
+    @ApiResponse({ status: 201, description: "Usuario creado exitosamente", type: UserResponseDto })
     @ApiResponse({ status: 500, description: "Error interno del servidor" })
-    async registerUser(@Body() userDto: CreateUserDto): Promise<User> {
-        return this.userService.registerUser(userDto);
+    async registerUser(@Body() userDto: CreateUserDto): Promise<UserResponseDto> {
+        const user = await this.userService.registerUser(userDto);
+        return toUserResponseDto(user);
     }
 
     @Patch("me")
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
     @ApiOperation({ summary: "Actualizar el perfil del usuario autenticado" })
-    @ApiOkResponse({ description: "Perfil actualizado correctamente" })
+    @ApiOkResponse({ description: "Perfil actualizado correctamente", type: UserResponseDto })
     async updateProfile(
         @Req() req: AuthenticatedRequest,
         @Body() dto: UpdateUserProfileDto,
-    ): Promise<User> {
-        return this.userService.updateProfile(Number(req.user.userId), dto);
+    ): Promise<UserResponseDto> {
+        const updatedUser = await this.userService.updateProfile(Number(req.user.userId), dto);
+        return toUserResponseDto(updatedUser);
     }
 
     @Patch("me/password")
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
-    @ApiOperation({ summary: "Actualizar la contraseña del usuario autenticado" })
-    @ApiOkResponse({ description: "Contraseña actualizada correctamente" })
+    @ApiOperation({ summary: "Actualizar la contrase\u00f1a del usuario autenticado" })
+    @ApiOkResponse({ description: "Contrase\u00f1a actualizada correctamente" })
     async updatePassword(
         @Req() req: AuthenticatedRequest,
         @Body() dto: UpdateUserPasswordDto,
     ): Promise<{ message: string }> {
         await this.userService.changePassword(Number(req.user.userId), dto);
-        return { message: "Contraseña actualizada correctamente" };
+        return { message: "Contrase\u00f1a actualizada correctamente" };
     }
 }
+
+
