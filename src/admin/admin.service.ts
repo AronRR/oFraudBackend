@@ -78,6 +78,9 @@ export class AdminService {
       host: String(row.host),
       reportsCount: Number(row.reportsCount ?? 0),
       approvedReportsCount: Number(row.approvedReportsCount ?? 0),
+      pendingReportsCount: Number(row.pendingReportsCount ?? 0),
+      rejectedReportsCount: Number(row.rejectedReportsCount ?? 0),
+      removedReportsCount: Number(row.removedReportsCount ?? 0),
     }));
   }
 
