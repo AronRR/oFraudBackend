@@ -14,7 +14,7 @@ Table users {
   phone_number varchar(20)
   password_hash char(60) [not null]
   password_salt char(29) [not null]
-  role enum('user','admin','moderator') [not null, default: 'user']
+  role enum('user','admin') [not null, default: 'user']
   is_blocked boolean [not null, default: false]
   blocked_reason varchar(255)
   blocked_by bigint
@@ -247,7 +247,7 @@ CREATE TABLE users (
   phone_number VARCHAR(20) NULL,
   password_hash CHAR(60) NOT NULL,
   password_salt CHAR(29) NOT NULL,
-  role ENUM('user','admin','moderator') NOT NULL DEFAULT 'user',
+  role ENUM('user','admin') NOT NULL DEFAULT 'user',
   is_blocked TINYINT(1) NOT NULL DEFAULT 0,
   blocked_reason VARCHAR(255) NULL,
   blocked_by BIGINT UNSIGNED NULL,
@@ -525,19 +525,19 @@ FROM report_flags f;
 
 ## Entity Relationship Notes
 
-- **users** manage authentication and account status. Admins and moderators are distinguished via the `role` enum, while `is_blocked` and `user_block_events` capture enforcement history and auditing trails.
+- **users** manage authentication and account status. Administrators are distinguished via the `role` enum, while `is_blocked` and `user_block_events` capture enforcement history and auditing trails.
 - **reports** anchor the fraud submissions. They always point at a **categories** row, maintain moderation state (`status` and `report_status_history`), and optionally track the latest approved **report_revisions** entry through `current_revision_id`.
 - **report_revisions** allow authors to edit while a report is pending. Once approved, `current_revision_id` freezes the canonical version unless moderation triggers more changes.
 - **report_media** ties ordered evidence assets to a specific revision, supporting up to five images or alternative file types.
-- **report_rejection_reasons** standardise moderator justifications, and `report_status_history` records every transition (including free-form notes and overrides).
+- **report_rejection_reasons** standardise administrator justifications, and `report_status_history` records every transition (including free-form notes and overrides).
 - **report_ratings** and **report_comments** capture community feedback on approved reports; unique constraints prevent duplicate ratings by the same user and support threaded conversations via `parent_comment_id`.
-- **report_flags** allow community escalation of problematic content; unique tuples keep the signal clean while `handled_by_user_id` tracks moderator resolution.
+- **report_flags** allow community escalation of problematic content; unique tuples keep the signal clean while `handled_by_user_id` tracks administrator resolution.
 - **category_search_logs** and the `reports_count`/`search_count` counters on **categories** enable aggregated insights and trending metrics.
 - **auth_refresh_tokens** and **user_password_resets** provide secure credential rotation flows, while `user_sessions` (if needed) can be derived from refresh token activity.
 
 ## Enumerations
 
-- `UserRole`: `user`, `admin`, `moderator`.
+- `UserRole`: `user`, `admin`.
 - `ReportStatus`: `pending`, `approved`, `rejected`, `removed`.
 - `BlockAction`: `blocked`, `unblocked` (used in `user_block_events`).
 - `MediaType`: `image`, `video`, `file`.
@@ -554,7 +554,6 @@ The following snippets illustrate how the schema can be implemented with NestJS 
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
-  MODERATOR = 'moderator',
 }
 
 export enum BlockAction {

@@ -3,7 +3,7 @@
 import { Injectable } from "@nestjs/common"
 import { JwtService } from "@nestjs/jwt"
 
-export type UserRole = 'user' | 'admin' | 'moderator';
+export type UserRole = 'user' | 'admin';
 
 export type UserProfile = {
     id: string;
