@@ -9,7 +9,6 @@ import { ReportCommentRepository, type ReportCommentRecord } from './report-comm
 import { ReportFlagRepository, type ReportFlagRecord } from './report-flag.repository';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
-import { AddMediaDto } from './dto/add-media.dto';
 import { GetReportsQueryDto, ReportsFeedSort } from './dto/get-reports-query.dto';
 import { GetReportsResponseDto } from './dto/get-reports-response.dto';
 import { GetMyReportsQueryDto } from './dto/get-my-reports-query.dto';
@@ -181,6 +180,31 @@ export class ReportsService {
   }
 
   async createReport(user: UserContext, dto: CreateReportDto): Promise<{ reportId: number; revisionId: number }> {
+    if (!dto.media || dto.media.length === 0) {
+      throw new BadRequestException('At least one media item is required');
+    }
+    if (dto.media.length > this.MAX_MEDIA_PER_REVISION) {
+      throw new BadRequestException('Too many media items');
+    }
+
+    const normalizedMedia = dto.media.map((item, index) => ({
+      fileUrl: item.fileUrl,
+      mediaType: item.mediaType,
+      position: item.position ?? index + 1,
+    }));
+
+    const hasInvalidPosition = normalizedMedia.some(
+      (item) => item.position < 1 || item.position > this.MAX_MEDIA_PER_REVISION,
+    );
+    if (hasInvalidPosition) {
+      throw new BadRequestException('Media position exceeds allowed range');
+    }
+
+    const uniquePositions = new Set(normalizedMedia.map((item) => item.position));
+    if (uniquePositions.size !== normalizedMedia.length) {
+      throw new BadRequestException('Duplicate media positions are not allowed');
+    }
+
     const isAnonymous = dto.isAnonymous ?? false;
     const publisherHost = dto.publisherHost ?? extractHostFromUrl(dto.incidentUrl) ?? null;
 
@@ -209,6 +233,16 @@ export class ReportsService {
         toStatus: 'pending',
         changedBy: user.userId,
       });
+
+      for (const mediaItem of normalizedMedia) {
+        await this.reportRepository.insertMedia(conn, {
+          revisionId,
+          fileUrl: mediaItem.fileUrl,
+          storageKey: null,
+          mediaType: mediaItem.mediaType,
+          position: mediaItem.position,
+        });
+      }
 
       return { reportId, revisionId };
     });
@@ -245,41 +279,6 @@ export class ReportsService {
       await this.reportRepository.updateReportCurrentRevision(conn, reportId, revisionId);
 
       return { revisionId };
-    });
-  }
-
-  async addMediaToRevision(user: UserContext, dto: AddMediaDto): Promise<{ mediaId: number }> {
-    return this.reportRepository.withTransaction(async (conn) => {
-      const revision = await this.reportRepository.findRevisionById(dto.revisionId, conn);
-      if (!revision) {
-        throw new NotFoundException('Revision not found');
-      }
-      if (revision.report_author_id !== user.userId) {
-        throw new ForbiddenException('You cannot modify this revision');
-      }
-      if (revision.report_status !== 'pending') {
-        throw new BadRequestException('Media can only be added while report is pending');
-      }
-
-      const currentCount = await this.reportRepository.countMediaForRevision(dto.revisionId, conn);
-      if (currentCount >= this.MAX_MEDIA_PER_REVISION) {
-        throw new BadRequestException('Maximum number of media items reached');
-      }
-
-      const position = dto.position ?? currentCount + 1;
-      if (position > this.MAX_MEDIA_PER_REVISION) {
-        throw new BadRequestException('Media position exceeds allowed range');
-      }
-
-      const mediaId = await this.reportRepository.insertMedia(conn, {
-        revisionId: dto.revisionId,
-        fileUrl: dto.fileUrl,
-        storageKey: dto.storageKey ?? null,
-        mediaType: dto.mediaType ?? 'image',
-        position,
-      });
-
-      return { mediaId };
     });
   }
 
