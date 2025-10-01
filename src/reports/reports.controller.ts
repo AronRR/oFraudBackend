@@ -8,7 +8,6 @@ import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-r
 import { ReportsService } from './reports.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
-import { AddMediaDto } from './dto/add-media.dto';
 import { ModerateReportDto } from './dto/moderate-report.dto';
 import { GetReportsQueryDto } from './dto/get-reports-query.dto';
 import { GetReportsResponseDto } from './dto/get-reports-response.dto';
@@ -65,17 +64,6 @@ export class ReportsController {
   ) {
     const userId = Number(req.user.userId);
     return this.reportsService.updateReport(reportId, { userId }, dto);
-  }
-
-  @Post('revisions/:id/media')
-  @UseGuards(JwtAuthGuard)
-  async addMedia(
-    @Req() req: AuthenticatedRequest,
-    @Param('id', ParseIntPipe) revisionId: number,
-    @Body() dto: Omit<AddMediaDto, 'revisionId'>,
-  ) {
-    const userId = Number(req.user.userId);
-    return this.reportsService.addMediaToRevision({ userId }, { ...dto, revisionId });
   }
 
   @Post('moderate')
