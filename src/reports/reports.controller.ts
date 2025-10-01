@@ -23,6 +23,7 @@ import { GetReportCommentsQueryDto } from './dto/get-report-comments-query.dto';
 import { GetReportCommentsResponseDto, ReportCommentDto } from './dto/get-report-comments-response.dto';
 import { CreateReportFlagDto } from './dto/create-report-flag.dto';
 import { ReportFlagResponseDto } from './dto/report-flag-response.dto';
+import { ReportDetailDto } from './dto/report-detail.dto';
 
 @ApiTags('Reports')
 @Controller('reports')
@@ -107,6 +108,13 @@ export class ReportsController {
     const userId = Number(req.user.userId);
     await this.reportsService.deleteReport(reportId, { userId });
     return { success: true };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Obtener detalle de un reporte aprobado' })
+  @ApiOkResponse({ type: ReportDetailDto })
+  async getApprovedReportDetail(@Param('id', ParseIntPipe) reportId: number): Promise<ReportDetailDto> {
+    return this.reportsService.getApprovedReportDetail(reportId);
   }
 
   @Get(':id/comments')
