@@ -59,6 +59,37 @@ export interface ApprovedReportWithRevision {
   publisherHost: string;
 }
 
+export interface ApprovedReportWithRelationsRow {
+  reportId: number;
+  status: ReportStatus;
+  categoryId: number | null;
+  categoryName: string | null;
+  categorySlug: string | null;
+  ratingAverage: string | null;
+  ratingCount: number;
+  publishedAt: Date | null;
+  approvedAt: Date | null;
+  createdAt: Date;
+  revisionId: number;
+  title: string | null;
+  description: string;
+  incidentUrl: string;
+  publisherHost: string;
+  isAnonymous: boolean;
+  authorId: number | null;
+  authorFirstName: string | null;
+  authorLastName: string | null;
+  authorUsername: string | null;
+}
+
+export interface ReportMediaRow {
+  mediaId: number;
+  revisionId: number;
+  fileUrl: string;
+  mediaType: string | null;
+  position: number;
+}
+
 export interface TopHostInsightRow {
   host: string;
   reportCount: number;
@@ -123,6 +154,93 @@ export class ReportRepository {
         [reportId],
       );
     return (rows as unknown as ReportRecord[])[0];
+  }
+
+  async findApprovedReportWithRelations(reportId: number): Promise<ApprovedReportWithRelationsRow | undefined> {
+    const [rows] = await this.dbService
+      .getPool()
+      .query<RowDataPacket[]>(
+        `SELECT
+           r.id AS report_id,
+           r.status,
+           r.category_id,
+           c.name AS category_name,
+           c.slug AS category_slug,
+           r.rating_average,
+           r.rating_count,
+           r.published_at,
+           r.approved_at,
+           r.created_at,
+           rr.id AS revision_id,
+           rr.title,
+           rr.description,
+           rr.incident_url,
+           rr.publisher_host,
+           r.is_anonymous,
+           u.id AS author_id,
+           u.first_name AS author_first_name,
+           u.last_name AS author_last_name,
+           u.username AS author_username
+         FROM reports r
+         INNER JOIN report_revisions rr ON rr.id = r.current_revision_id
+         LEFT JOIN categories c ON c.id = r.category_id
+         LEFT JOIN users u ON u.id = r.author_id
+         WHERE r.id = ?
+           AND r.status = 'approved'
+           AND r.deleted_at IS NULL
+         LIMIT 1`,
+        [reportId],
+      );
+
+    const row = (rows as unknown as Array<{
+      report_id: number;
+      status: ReportStatus;
+      category_id: number | null;
+      category_name: string | null;
+      category_slug: string | null;
+      rating_average: string | null;
+      rating_count: number;
+      published_at: Date | null;
+      approved_at: Date | null;
+      created_at: Date;
+      revision_id: number;
+      title: string | null;
+      description: string;
+      incident_url: string;
+      publisher_host: string;
+      is_anonymous: number;
+      author_id: number | null;
+      author_first_name: string | null;
+      author_last_name: string | null;
+      author_username: string | null;
+    }>)[0];
+
+    if (!row) {
+      return undefined;
+    }
+
+    return {
+      reportId: row.report_id,
+      status: row.status,
+      categoryId: row.category_id,
+      categoryName: row.category_name,
+      categorySlug: row.category_slug,
+      ratingAverage: row.rating_average,
+      ratingCount: Number(row.rating_count ?? 0),
+      publishedAt: row.published_at ?? null,
+      approvedAt: row.approved_at ?? null,
+      createdAt: row.created_at,
+      revisionId: row.revision_id,
+      title: row.title ?? null,
+      description: row.description,
+      incidentUrl: row.incident_url,
+      publisherHost: row.publisher_host,
+      isAnonymous: row.is_anonymous === 1,
+      authorId: row.author_id ?? null,
+      authorFirstName: row.author_first_name,
+      authorLastName: row.author_last_name,
+      authorUsername: row.author_username,
+    };
   }
 
   async findReportForUpdate(reportId: number, conn: PoolConnection): Promise<ReportRecord | undefined> {
@@ -310,6 +428,32 @@ export class ReportRepository {
     );
     const result = rows as unknown as Array<{ total: number }>;
     return result[0]?.total ?? 0;
+  }
+
+  async listMediaByRevision(revisionId: number): Promise<ReportMediaRow[]> {
+    const [rows] = await this.dbService
+      .getPool()
+      .query<RowDataPacket[]>(
+        `SELECT id, revision_id, file_url, media_type, position
+         FROM report_media
+         WHERE revision_id = ? AND deleted_at IS NULL
+         ORDER BY position ASC, id ASC`,
+        [revisionId],
+      );
+
+    return (rows as unknown as Array<{
+      id: number;
+      revision_id: number;
+      file_url: string;
+      media_type: string | null;
+      position: number;
+    }>).map((row) => ({
+      mediaId: row.id,
+      revisionId: row.revision_id,
+      fileUrl: row.file_url,
+      mediaType: row.media_type ?? null,
+      position: Number(row.position ?? 0),
+    }));
   }
 
   async softDeleteMediaByRevision(conn: PoolConnection, revisionId: number): Promise<void> {

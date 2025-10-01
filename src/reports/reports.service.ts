@@ -24,6 +24,7 @@ import { GetReportCommentsQueryDto } from './dto/get-report-comments-query.dto';
 import { GetReportCommentsResponseDto, ReportCommentDto } from './dto/get-report-comments-response.dto';
 import { CreateReportFlagDto } from './dto/create-report-flag.dto';
 import { ReportFlagResponseDto } from './dto/report-flag-response.dto';
+import { ReportDetailDto } from './dto/report-detail.dto';
 
 interface UserContext {
   userId: number;
@@ -81,6 +82,70 @@ export class ReportsService {
           totalRatings: item.totalRatings,
         })),
       },
+    };
+  }
+
+  async getApprovedReportDetail(reportId: number): Promise<ReportDetailDto> {
+    const report = await this.reportRepository.findApprovedReportWithRelations(reportId);
+
+    if (!report) {
+      throw new NotFoundException('Report not found');
+    }
+
+    if (report.status !== 'approved') {
+      throw new NotFoundException('Report is not approved');
+    }
+
+    const media = await this.reportRepository.listMediaByRevision(report.revisionId);
+
+    const category = report.categoryId
+      ? {
+          id: report.categoryId,
+          name: report.categoryName ?? null,
+          slug: report.categorySlug ?? null,
+        }
+      : null;
+
+    let displayName = '';
+    if (report.authorFirstName?.trim()) {
+      displayName = report.authorFirstName.trim();
+    }
+    if (report.authorLastName?.trim()) {
+      displayName = displayName
+        ? `${displayName} ${report.authorLastName.trim()}`.trim()
+        : report.authorLastName.trim();
+    }
+    if (!displayName && report.authorUsername?.trim()) {
+      displayName = report.authorUsername.trim();
+    }
+
+    const author = report.isAnonymous
+      ? { isAnonymous: true, authorId: null, displayName: null }
+      : {
+          isAnonymous: false,
+          authorId: report.authorId,
+          displayName: displayName || null,
+        };
+
+    return {
+      reportId: report.reportId,
+      title: report.title ?? null,
+      description: report.description,
+      incidentUrl: report.incidentUrl,
+      publisherHost: report.publisherHost,
+      createdAt: report.createdAt.toISOString(),
+      approvedAt: report.approvedAt ? report.approvedAt.toISOString() : null,
+      publishedAt: report.publishedAt ? report.publishedAt.toISOString() : null,
+      category,
+      author,
+      media: media.map((item) => ({
+        mediaId: item.mediaId,
+        fileUrl: item.fileUrl,
+        mediaType: item.mediaType ?? null,
+        position: item.position,
+      })),
+      ratingAverage: report.ratingAverage != null ? Number(report.ratingAverage) : 0,
+      ratingCount: report.ratingCount,
     };
   }
 
