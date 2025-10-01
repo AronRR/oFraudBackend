@@ -8,6 +8,10 @@ import { ReportRepository, ReportStatus, type ReportRecord } from 'src/reports/r
 import { RejectionReasonRepository } from 'src/reports/rejection-reason.repository';
 import { TokenService } from 'src/auth/tokens.service';
 
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'test-secret-key';
+}
+
 interface MockUser {
   id: number;
   email: string;
@@ -36,6 +40,7 @@ interface MockRevision {
   id: number;
   reportId: number;
   title: string | null;
+  createdAt: Date;
 }
 
 interface MockCategory {
@@ -202,6 +207,48 @@ const buildMockReportRepository = (state: MockState): ReportRepository => {
     return { items, total };
   });
 
+  const findReportsByAuthor = jest.fn(
+    async (params: { authorId: number; status?: ReportStatus; limit: number; offset: number }) => {
+      const { authorId, status, limit, offset } = params;
+
+      let reports = Array.from(state.reports.values()).filter((report) => report.authorId === authorId);
+
+      if (status) {
+        reports = reports.filter((report) => report.status === status);
+      }
+
+      if (status && status !== 'removed') {
+        reports = reports.filter((report) => !report.deletedAt);
+      }
+
+      reports.sort((a, b) => {
+        const diff = b.updatedAt.getTime() - a.updatedAt.getTime();
+        return diff !== 0 ? diff : b.id - a.id;
+      });
+
+      const total = reports.length;
+      const slice = reports.slice(offset, offset + limit);
+
+      const items = slice.map((report) => {
+        const revision = report.currentRevisionId ? state.revisions.get(report.currentRevisionId) : undefined;
+        const category = state.categories.get(report.categoryId);
+
+        return {
+          reportId: report.id,
+          title: revision?.title ?? null,
+          status: report.status,
+          categoryId: report.categoryId,
+          categoryName: category?.name ?? null,
+          createdAt: report.createdAt,
+          updatedAt: report.updatedAt,
+          lastEditedAt: revision?.createdAt ?? report.updatedAt,
+        } as any;
+      });
+
+      return { items, total };
+    },
+  );
+
   return {
     withTransaction,
     findReportForUpdate,
@@ -210,6 +257,7 @@ const buildMockReportRepository = (state: MockState): ReportRepository => {
     appendStatusHistory,
     softDeleteReport,
     findReportsForAdmin,
+    findReportsByAuthor,
   } as unknown as ReportRepository;
 };
 
@@ -289,11 +337,27 @@ describe('Admin moderation console (e2e)', () => {
           updatedAt: new Date('2024-01-03T09:00:00Z'),
           deletedAt: null,
         }],
+        [13, {
+          id: 13,
+          status: 'removed',
+          authorId: 3,
+          categoryId: 6,
+          currentRevisionId: 1004,
+          reviewedBy: 1,
+          reviewedAt: new Date('2024-01-04T09:30:00Z'),
+          publishedAt: null,
+          reviewNotes: 'Contenido retirado por incumplir políticas',
+          rejectionReasonText: 'Incumplimiento de normas',
+          createdAt: new Date('2024-01-02T11:00:00Z'),
+          updatedAt: new Date('2024-01-04T09:30:00Z'),
+          deletedAt: new Date('2024-01-04T09:30:00Z'),
+        }],
       ]),
       revisions: new Map<number, MockRevision>([
-        [1001, { id: 1001, reportId: 10, title: 'Campaña sospechosa en redes' }],
-        [1002, { id: 1002, reportId: 11, title: 'Portal falso de banca' }],
-        [1003, { id: 1003, reportId: 12, title: 'Venta engañosa por email' }],
+        [1001, { id: 1001, reportId: 10, title: 'Campaña sospechosa en redes', createdAt: new Date('2024-01-01T10:00:00Z') }],
+        [1002, { id: 1002, reportId: 11, title: 'Portal falso de banca', createdAt: new Date('2024-01-01T08:00:00Z') }],
+        [1003, { id: 1003, reportId: 12, title: 'Venta engañosa por email', createdAt: new Date('2024-01-03T09:00:00Z') }],
+        [1004, { id: 1004, reportId: 13, title: 'Marketplace fraudulento retirado', createdAt: new Date('2024-01-02T11:00:00Z') }],
       ]),
       categories: new Map<number, MockCategory>([
         [5, { id: 5, name: 'Estafas digitales' }],
@@ -336,6 +400,20 @@ describe('Admin moderation console (e2e)', () => {
       email: 'admin@ofraud.test',
       name: 'Admin Root',
       role: 'admin',
+    });
+  };
+
+  const getUserToken = async (userId: number) => {
+    const user = state.users.get(userId);
+    if (!user) {
+      throw new Error(`User ${userId} not found in state`);
+    }
+
+    return tokenService.generateAccess({
+      id: String(user.id),
+      email: user.email,
+      name: `${user.firstName} ${user.lastName}`.trim(),
+      role: user.role,
     });
   };
 
@@ -422,7 +500,38 @@ describe('Admin moderation console (e2e)', () => {
       .query({ status: 'removed' })
       .expect(200);
 
-    expect(adminListing.body.meta.total).toBe(1);
-    expect(adminListing.body.items[0].reportId).toBe(11);
+    expect(adminListing.body.meta.total).toBe(2);
+    expect(adminListing.body.items).toHaveLength(2);
+    expect(adminListing.body.items.some((item: any) => item.reportId === 11)).toBe(true);
+  });
+
+  it('GET /reports/mine incluye reportes removed sin filtro de estado', async () => {
+    const userToken = await getUserToken(3);
+
+    const response = await request(app.getHttpServer())
+      .get('/reports/mine')
+      .set('Authorization', `Bearer ${userToken}`)
+      .query({ page: 1, limit: 10 })
+      .expect(200);
+    expect(response.body.meta).toEqual({ page: 1, limit: 10, total: 3 });
+    expect(response.body.items).toHaveLength(3);
+    expect(
+      response.body.items.some(
+        (item: any) => item.reportId === 13 && item.status === 'removed',
+      ),
+    ).toBe(true);
+  });
+
+  it('GET /reports/mine filtra correctamente los reportes removed', async () => {
+    const userToken = await getUserToken(3);
+
+    const response = await request(app.getHttpServer())
+      .get('/reports/mine')
+      .set('Authorization', `Bearer ${userToken}`)
+      .query({ status: 'removed', page: 1, limit: 10 })
+      .expect(200);
+    expect(response.body.meta).toEqual({ page: 1, limit: 10, total: 1 });
+    expect(response.body.items).toHaveLength(1);
+    expect(response.body.items[0]).toMatchObject({ reportId: 13, status: 'removed' });
   });
 });

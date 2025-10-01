@@ -13,14 +13,14 @@ export class GetMyReportsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number;
+  page: number = 1;
 
   @ApiPropertyOptional({ description: 'Cantidad de reportes por página', example: 10 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  limit?: number;
+  limit: number = 10;
 
   @ApiPropertyOptional({ description: 'Filtrar reportes por estado actual', enum: REPORT_STATUS_VALUES })
   @IsOptional()
