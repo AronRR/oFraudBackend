@@ -14,8 +14,8 @@ export class AddMediaDto {
   storageKey?: string | null;
 
   @IsOptional()
-  @IsIn(['image', 'video', 'file'])
-  mediaType?: 'image' | 'video' | 'file';
+  @IsIn(['image', 'video'])
+  mediaType?: 'image' | 'video';
 
   @IsOptional()
   @IsInt()
