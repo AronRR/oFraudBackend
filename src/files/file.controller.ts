@@ -29,7 +29,7 @@ export const fileTypeFilter = (req: Request, file: Express.Multer.File, cb: File
         cb(
             new BadRequestException(
                 `Tipo de archivo no permitido. Solo se permiten ${SUPPORTED_MEDIA_TYPES_DESCRIPTION}.`,
-            ),
+            ) as any,
             false,
         );
         return;

@@ -1,0 +1,125 @@
+{
+  "phishing": {
+    "topic": "phishing",
+    "title": "¿Qué es el phishing?",
+    "description": "El phishing es un tipo de fraude en línea donde los estafadores se hacen pasar por bancos, tiendas o servicios conocidos para engañarte y obtener tu información personal, como contraseñas o datos bancarios.",
+    "tips": [
+      {
+        "icon": "✅",
+        "text": "Verifica siempre la dirección del sitio web (que sea oficial y segura: https://)."
+      },
+      {
+        "icon": "✅",
+        "text": "No abras enlaces sospechosos en correos o mensajes."
+      },
+      {
+        "icon": "✅",
+        "text": "Desconfía de premios, ofertas o descuentos \"demasiado buenos para ser verdad\"."
+      },
+      {
+        "icon": "✅",
+        "text": "Nunca compartas contraseñas o datos sensibles por correo, SMS o llamadas."
+      },
+      {
+        "icon": "✅",
+        "text": "Activa la autenticación en dos pasos en tus cuentas."
+      }
+    ]
+  },
+  "what-to-do": {
+    "topic": "what-to-do",
+    "title": "¿Qué hacer si fui víctima de fraude?",
+    "description": "Si crees que fuiste víctima de fraude, sigue estos pasos inmediatamente:",
+    "steps": [
+      {
+        "title": "Bloquea tu tarjeta o cuenta",
+        "description": "Contacta a tu banco de inmediato para bloquear cualquier acceso no autorizado."
+      },
+      {
+        "title": "Cambia tus contraseñas",
+        "description": "Actualiza tus contraseñas y activa la autenticación en dos pasos en todas tus cuentas."
+      },
+      {
+        "title": "Guarda evidencia",
+        "description": "Toma capturas de pantalla, guarda mensajes y correos electrónicos relacionados con el fraude."
+      },
+      {
+        "title": "Reporta el incidente",
+        "description": "Presenta una denuncia ante Condusef o las autoridades competentes en tu país."
+      },
+      {
+        "title": "Alerta a la comunidad",
+        "description": "Usa Ofraud para reportar el fraude y proteger a otros usuarios de caer en la misma trampa."
+      }
+    ],
+    "additionalInfo": "⚠️ Revisa tus cuentas regularmente y mantente alerta ante mensajes sospechosos."
+  },
+  "preventive-tips": {
+    "topic": "preventive-tips",
+    "title": "Consejos preventivos y Recomendaciones",
+    "description": "Protégete del fraude en línea siguiendo estas recomendaciones:",
+    "tips": [
+      {
+        "icon": "🔒",
+        "text": "No compartas tus contraseñas ni códigos OTP."
+      },
+      {
+        "icon": "🎁",
+        "text": "Desconfía de ofertas demasiado buenas."
+      },
+      {
+        "icon": "🛡️",
+        "text": "Activa la autenticación en dos pasos."
+      },
+      {
+        "icon": "🔍",
+        "text": "Comprueba URLs y apps antes de comprar."
+      },
+      {
+        "icon": "📱",
+        "text": "Mantén tu dispositivo actualizado."
+      },
+      {
+        "icon": "📊",
+        "text": "Monitorea tus cuentas y movimientos."
+      },
+      {
+        "icon": "👥",
+        "text": "Comparte alertas con familiares y amigos."
+      }
+    ]
+  },
+  "identity-theft": {
+    "topic": "identity-theft",
+    "title": "Robo de Identidad",
+    "description": "El robo de identidad ocurre cuando alguien usa tu información personal sin permiso para cometer fraudes o delitos.",
+    "tips": [
+      {
+        "icon": "⚠️",
+        "text": "No compartas documentos oficiales (INE, pasaporte) en sitios no verificados."
+      },
+      {
+        "icon": "🔐",
+        "text": "Usa contraseñas únicas y complejas para cada cuenta."
+      },
+      {
+        "icon": "📧",
+        "text": "Verifica remitentes de correos antes de abrir archivos adjuntos."
+      },
+      {
+        "icon": "🏦",
+        "text": "Revisa regularmente tus estados de cuenta bancarios."
+      },
+      {
+        "icon": "📞",
+        "text": "Si recibes llamadas sospechosas pidiendo datos, cuelga y verifica directamente con la institución."
+      }
+    ]
+  },
+  "detection-time": {
+    "topic": "detection-time",
+    "title": "Tiempo promedio de detección de fraude en México",
+    "description": "Los usuarios suelen percatarse de estos fraudes después de aproximadamente 28 días.",
+    "additionalInfo": "Mantente alerta y revisa tus transacciones frecuentemente para detectar actividad sospechosa a tiempo."
+  }
+}
