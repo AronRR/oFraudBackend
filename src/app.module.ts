@@ -12,13 +12,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { FilesModule } from './files/files.module';
 import { ReportsModule } from './reports/reports.module';
 import { AdminModule } from './admin/admin.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true }), JwtModule.register({
       global: true,
       secret:"supersecret"
   }), 
-  DbModule, UserModule, AuthModule, FilesModule, ReportsModule, AdminModule],
+  DbModule, UserModule, AuthModule, FilesModule, ReportsModule, AdminModule, CategoriesModule],
   controllers: [AppController],
   providers: [AppService],
 })
