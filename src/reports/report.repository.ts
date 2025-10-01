@@ -605,8 +605,13 @@ export class ReportRepository {
   }): Promise<{ items: AuthorReportRow[]; total: number }> {
     const { authorId, status, limit, offset } = params;
 
-    const conditions = ['r.author_id = ?', 'r.deleted_at IS NULL'];
+    const conditions = ['r.author_id = ?'];
     const values: Array<number | string> = [authorId];
+
+    const shouldIncludeDeleted = !status || status === 'removed';
+    if (!shouldIncludeDeleted) {
+      conditions.push('r.deleted_at IS NULL');
+    }
 
     if (status) {
       conditions.push('r.status = ?');
