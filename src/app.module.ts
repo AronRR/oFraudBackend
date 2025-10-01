@@ -13,12 +13,10 @@ import { FilesModule } from './files/files.module';
 import { ReportsModule } from './reports/reports.module';
 import { AdminModule } from './admin/admin.module';
 import { CategoriesModule } from './categories/categories.module';
+import { jwtConfig } from './config/jwt.config';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), JwtModule.register({
-      global: true,
-      secret:"supersecret"
-  }), 
+  imports: [ConfigModule.forRoot({ isGlobal: true }), JwtModule.registerAsync(jwtConfig),
   DbModule, UserModule, AuthModule, FilesModule, ReportsModule, AdminModule, CategoriesModule],
   controllers: [AppController],
   providers: [AppService],
