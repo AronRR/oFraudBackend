@@ -59,16 +59,24 @@ $ npm run test:cov
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+All environments **must** be provisioned through the versioned migration scripts stored in the `migrations/` directory. This keeps the database schema consistent between development, staging, and production.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+1. Configure the database connection by exporting the `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME` variables (defaults target `localhost:3306` and database `ofraud`).
+2. Apply migrations in chronological order using `ts-node` or `tsx`. For example:
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+   ```bash
+   npx ts-node migrations/202412010000_init_schema.ts up
+   npx ts-node migrations/202412050000_rehash_passwords_with_bcrypt.ts
+   npx ts-node migrations/202412060001_create_user_audit_tables.ts
+   ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+   The initial migration accepts a `down` argument to destroy the schema when you need a clean database:
+
+   ```bash
+   npx ts-node migrations/202412010000_init_schema.ts down
+   ```
+
+3. Deploy the NestJS application only after the required migrations have been executed successfully.
 
 ## Resources
 
