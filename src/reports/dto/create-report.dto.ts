@@ -1,6 +1,36 @@
 /* eslint-disable prettier/prettier */
 
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CreateReportMediaDto {
+  @IsUrl({ require_tld: false })
+  fileUrl: string;
+
+  @IsIn(['image', 'video'])
+  mediaType: 'image' | 'video';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  position?: number;
+}
 
 export class CreateReportDto {
   @IsInt()
@@ -26,4 +56,11 @@ export class CreateReportDto {
   @IsString()
   @MaxLength(255)
   publisherHost?: string | null;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => CreateReportMediaDto)
+  media: CreateReportMediaDto[];
 }
