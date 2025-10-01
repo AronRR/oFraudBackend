@@ -1,26 +1,36 @@
 /* eslint-disable prettier/prettier */
 
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Pool, createPool } from "mysql2/promise";
 
 @Injectable()
-export class DbService implements OnModuleInit, OnModuleDestroy{
+export class DbService implements OnModuleInit, OnModuleDestroy {
     private pool: Pool;
 
-    onModuleInit():void {
+    constructor(private readonly configService: ConfigService) {}
+
+    onModuleInit(): void {
+        const host = this.configService.get<string>("DB_HOST", "localhost");
+        const port = Number(this.configService.get<string>("DB_PORT", "3306"));
+        const user = this.configService.get<string>("DB_USER", "root");
+        const password = this.configService.get<string>("DB_PASSWORD", "");
+        const database = this.configService.get<string>("DB_NAME", "ofraud");
+
         this.pool = createPool({
-            host: 'localhost',
-            user: 'root',
-            password: 'Aroneflaco12&',
-            database: 'ofraud',
-        })
-    }
-    onModuleDestroy() {
-       void this.pool.end();
+            host,
+            port,
+            user,
+            password,
+            database,
+        });
     }
 
-    getPool():Pool{
+    onModuleDestroy(): void {
+        void this.pool.end();
+    }
+
+    getPool(): Pool {
         return this.pool;
     }
-    
 }

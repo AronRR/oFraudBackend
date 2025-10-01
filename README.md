@@ -31,6 +31,18 @@
 $ npm install
 ```
 
+## Environment variables
+
+Create a `.env` file based on the provided `.env.example` to configure the database connection that backs the application.
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `DB_HOST` | Hostname or IP address of the MySQL server. | `localhost` |
+| `DB_PORT` | TCP port where the MySQL server listens. | `3306` |
+| `DB_USER` | Username used to authenticate against MySQL. | `root` |
+| `DB_PASSWORD` | Password for the configured MySQL user. | _(empty)_ |
+| `DB_NAME` | Database schema that stores the oFraud tables. | `ofraud` |
+
 ## Compile and run the project
 
 ```bash
@@ -61,7 +73,7 @@ $ npm run test:cov
 
 All environments **must** be provisioned through the versioned migration scripts stored in the `migrations/` directory. This keeps the database schema consistent between development, staging, and production.
 
-1. Configure the database connection by exporting the `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME` variables (defaults target `localhost:3306` and database `ofraud`).
+1. Configure the database connection by exporting the `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME` variables (the defaults in `.env.example` target `localhost:3306` and database `ofraud`).
 2. Apply migrations in chronological order using `ts-node` or `tsx`. For example:
 
    ```bash
