@@ -226,21 +226,23 @@ export class AdminRepository {
   }
 
   async getTopCategories(limit: number): Promise<RowDataPacket[]> {
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 5;
     const sql = `
       SELECT id, name, slug, reports_count AS reportsCount, search_count AS searchCount
       FROM categories
       ORDER BY reports_count DESC, search_count DESC
-      LIMIT ?
+      LIMIT CAST(? AS UNSIGNED)
     `;
 
     const [rows] = await this.dbService
       .getPool()
-      .execute<RowDataPacket[]>(sql, [limit]);
+      .execute<RowDataPacket[]>(sql, [safeLimit]);
 
     return rows;
   }
 
   async getTopHosts(limit: number): Promise<RowDataPacket[]> {
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 5;
     const sql = `
       SELECT
         approved.host,
@@ -271,12 +273,12 @@ export class AdminRepository {
         GROUP BY rr.publisher_host
       ) AS totals ON totals.host = approved.host
       ORDER BY approved.approvedReportsCount DESC, COALESCE(totals.totalReportsCount, 0) DESC
-      LIMIT ?
+      LIMIT CAST(? AS UNSIGNED)
     `;
 
     const [rows] = await this.dbService
       .getPool()
-      .execute<RowDataPacket[]>(sql, [limit]);
+      .execute<RowDataPacket[]>(sql, [safeLimit]);
 
     return rows;
   }
