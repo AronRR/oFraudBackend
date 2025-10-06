@@ -38,11 +38,40 @@ export class AuthController{
     @Get("profile")
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
+    @ApiOperation({ summary: "Obtener perfil del usuario autenticado" })
+    @ApiOkResponse({
+        description: "Perfil del usuario obtenido correctamente",
+        schema: {
+            type: "object",
+            properties: {
+                profile: {
+                    type: "object",
+                    properties: {
+                        id: { type: "string" },
+                        email: { type: "string" },
+                        name: { type: "string" },
+                        role: { type: "string" }
+                    }
+                }
+            }
+        }
+    })
     getProfile(@Req() req: AuthenticatedRequest){
         return {profile: req.user.profile}
     }
 
     @Post("refresh")
+    @ApiOperation({ summary: "Renovar token de acceso usando refresh token" })
+    @ApiBody({ type: RefreshTokenDto, description: "Refresh token válido" })
+    @ApiOkResponse({
+        description: "Token de acceso renovado correctamente",
+        schema: {
+            type: "object",
+            properties: {
+                accessToken: { type: "string", description: "Nuevo token de acceso JWT" }
+            }
+        }
+    })
     async refresh(@Body() dto: RefreshTokenDto){
         try{
             const profile= await this.tokenService.verifyRefresh(dto.refreshToken);

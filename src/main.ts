@@ -21,9 +21,24 @@ async function bootstrap() {
     .setTitle('API de Gestión de Usuarios')
     .setDescription('API para gestionar usuarios con autenticación JWT')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
   const doc = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, doc);
+
+  // Swagger UI clásico (puedes dejarlo o quitarlo)
+  SwaggerModule.setup('docs', app, doc, {
+    jsonDocumentUrl: '/docs-json',
+  });
+
+  // Scalar - Documentación moderna
+  const { apiReference } = await import('@scalar/nestjs-api-reference');
+  app.use(
+    '/reference',
+    apiReference({
+      theme: 'purple',
+      url: '/docs-json',
+    } as any),
+  );
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

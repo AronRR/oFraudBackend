@@ -50,6 +50,17 @@ export class ReportsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Crear un nuevo reporte de fraude' })
+  @ApiCreatedResponse({
+    description: 'Reporte creado exitosamente y enviado a moderación',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        status: { type: 'string', example: 'pending' }
+      }
+    }
+  })
   async createReport(@Req() req: AuthenticatedRequest, @Body() dto: CreateReportDto) {
     const userId = Number(req.user.userId);
     return this.reportsService.createReport({ userId }, dto);
@@ -57,6 +68,17 @@ export class ReportsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Actualizar un reporte existente' })
+  @ApiOkResponse({
+    description: 'Reporte actualizado correctamente',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        message: { type: 'string', example: 'Reporte actualizado correctamente' }
+      }
+    }
+  })
   async updateReport(
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) reportId: number,
@@ -89,6 +111,16 @@ export class ReportsController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Eliminar un reporte propio' })
+  @ApiOkResponse({
+    description: 'Reporte eliminado correctamente',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true }
+      }
+    }
+  })
   async deleteReport(
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) reportId: number,
