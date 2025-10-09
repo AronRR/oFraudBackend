@@ -56,6 +56,35 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Admin dashboard (React)
+
+The repository now includes a Vite + React dashboard inside the `frontend/` directory to help administrators moderate
+fraud reports and track key indicators exposed by the API.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+By default the dashboard expects the API to be available at `http://localhost:3000`. You can override that origin by
+creating a `.env` file in `frontend/` with a `VITE_API_BASE_URL` entry, for example:
+
+```bash
+VITE_API_BASE_URL=https://api.ofraud.test
+```
+
+### Dashboard features
+
+- **Authentication**: Admins can log in with their credentials. The dashboard stores and refreshes access tokens
+  transparently using the `/auth/login`, `/auth/profile`, and `/auth/refresh` endpoints.
+- **Overview**: Visualize system metrics such as report totals, moderation workload, and the top categories/hosts sourced
+  from `/admin/metrics/*` and `/insights/fraud-stats`.
+- **Report moderation**: Review, approve, reject, or remove community reports through `/admin/reports` and
+  `/reports/moderate`.
+- **Community alerts**: Validate or dismiss report flags using `/admin/report-flags` and `/admin/report-flags/:id`.
+- **Category management**: Create or edit report categories with `/admin/categories`.
+
 ## Run tests
 
 ```bash
