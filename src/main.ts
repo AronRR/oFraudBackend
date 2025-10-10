@@ -8,6 +8,13 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Enable CORS for frontend
+  app.enableCors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    credentials: true,
+  });
+
   app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/public/' });
   app.useGlobalPipes(
     new ValidationPipe({
