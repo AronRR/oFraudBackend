@@ -2,6 +2,7 @@
 
 import { Body, Controller, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import type { AuthenticatedRequest } from "src/common/interfaces/authenticated-request";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { CreateUserDto } from "./dto/create-user.dto";
@@ -16,6 +17,7 @@ export class UserController {
     constructor(private readonly userService: UserService) {}
 
     @Post()
+    @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 3 requests per hour
     @ApiResponse({ status: 201, description: "Usuario creado exitosamente", type: UserResponseDto })
     @ApiResponse({ status: 500, description: "Error interno del servidor" })
     async registerUser(@Body() userDto: CreateUserDto): Promise<UserResponseDto> {

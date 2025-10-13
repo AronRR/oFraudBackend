@@ -2,6 +2,7 @@
 
 import { Body, Controller, Get, Post, Req, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import type { AuthenticatedRequest } from "src/common/interfaces/authenticated-request";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { UserService } from "src/users/user.service";
@@ -18,10 +19,11 @@ export class AuthController{
     ){}
     
     @Post("login")
+    @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
     @ApiOperation({ summary: "Iniciar sesión" })
     @ApiBody({ type: LoginRequestDto, description: "Credenciales de acceso" })
     @ApiOkResponse({ description: "Tokens generados correctamente", type: LoginResponseDto })
-    async login(@Body() dto: LoginRequestDto): Promise<LoginResponseDto>{
+    async login(@Body() dto: LoginRequestDto, @Req() req: any): Promise<LoginResponseDto>{
         const usuario= await this.userService.login(dto.email, dto.password);
         const userName = `${usuario.first_name} ${usuario.last_name}`.trim() || usuario.username;
         const userProfile = {
@@ -31,7 +33,8 @@ export class AuthController{
             role: usuario.role,
         };
         const accessToken = await this.tokenService.generateAccess(userProfile);
-        const refreshToken= await this.tokenService.generateRefresh(usuario.id.toString());
+        const ipAddress = req.ip || req.socket?.remoteAddress;
+        const refreshToken= await this.tokenService.generateRefresh(usuario.id.toString(), ipAddress);
         return { message: "Inicio de sesión exitoso", accessToken, refreshToken };
     }
 
@@ -87,6 +90,29 @@ export class AuthController{
             return {accessToken: newAccessToken};
         }catch(error){
             // TODO: Consider implementing rate limiting or logging for repeated refresh failures.
+            throw new UnauthorizedException("Token de refresco inválido");
+        }
+    }
+
+    @Post("logout")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Cerrar sesión y revocar refresh token" })
+    @ApiBody({ type: RefreshTokenDto, description: "Refresh token a revocar" })
+    @ApiOkResponse({
+        description: "Sesión cerrada correctamente",
+        schema: {
+            type: "object",
+            properties: {
+                message: { type: "string" }
+            }
+        }
+    })
+    async logout(@Body() dto: RefreshTokenDto, @Req() req: AuthenticatedRequest){
+        try{
+            await this.tokenService.revokeRefreshToken(dto.refreshToken, "Usuario cerró sesión");
+            return { message: "Sesión cerrada correctamente" };
+        }catch(error){
             throw new UnauthorizedException("Token de refresco inválido");
         }
     }

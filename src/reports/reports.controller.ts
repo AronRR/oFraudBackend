@@ -2,6 +2,7 @@
 
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { AdminRoleGuard } from 'src/common/guards/admin-role.guard';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request';
@@ -50,6 +51,7 @@ export class ReportsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 3600000 } }) // 10 requests per hour
   @ApiOperation({ summary: 'Crear un nuevo reporte de fraude' })
   @ApiCreatedResponse({
     description: 'Reporte creado exitosamente y enviado a moderación',
