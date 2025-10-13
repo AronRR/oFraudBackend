@@ -407,6 +407,11 @@ export class ReportsService {
         throw new NotFoundException('Report not available for ratings');
       }
 
+      // Prevent self-rating
+      if (report.author_id === user.userId) {
+        throw new BadRequestException('No puedes calificar tu propio reporte');
+      }
+
       const existing = await this.reportRatingRepository.findByReportAndUser(reportId, user.userId, conn);
       if (existing) {
         throw new BadRequestException('You have already rated this report');

@@ -18,6 +18,8 @@ import { GetReportFlagsQueryDto } from './dto/get-report-flags-query.dto';
 import { GetReportFlagsResponseDto, AdminReportFlagItemDto } from './dto/get-report-flags-response.dto';
 import { ResolveReportFlagDto } from './dto/resolve-report-flag.dto';
 import { ReportFlagResponseDto } from 'src/reports/dto/report-flag-response.dto';
+import { GetAdminUsersQueryDto } from './dto/get-admin-users-query.dto';
+import { GetAdminUsersResponseDto, AdminUserDto } from './dto/get-admin-users-response.dto';
 
 @Injectable()
 export class AdminService {
@@ -192,6 +194,47 @@ export class AdminService {
     if (!updated) {
       throw new NotFoundException('Usuario no encontrado');
     }
+  }
+
+  async listUsers(query: GetAdminUsersQueryDto): Promise<GetAdminUsersResponseDto> {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const { items, total, counts } = await this.adminRepository.listUsers({
+      is_blocked: query.is_blocked === 'true' ? true : query.is_blocked === 'false' ? false : undefined,
+      search: query.search,
+      limit,
+      offset,
+    });
+
+    return {
+      items: items.map((row) => ({
+        id: Number(row.id),
+        email: String(row.email),
+        username: String(row.username),
+        first_name: String(row.first_name),
+        last_name: String(row.last_name),
+        phone_number: row.phone_number ?? null,
+        role: row.role as 'user' | 'admin',
+        is_blocked: Boolean(row.is_blocked),
+        blocked_at: row.blocked_at ? new Date(row.blocked_at) : null,
+        blocked_reason: row.blocked_reason ?? null,
+        blocked_by: row.blocked_by ? Number(row.blocked_by) : null,
+        created_at: new Date(row.created_at),
+        updated_at: new Date(row.updated_at),
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+      },
+      counts: {
+        total: counts.total || 0,
+        blocked: counts.blocked || 0,
+        active: counts.active || 0,
+      },
+    };
   }
 
   async getMetricsOverview(): Promise<MetricsOverviewDto> {

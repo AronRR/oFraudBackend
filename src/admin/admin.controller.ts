@@ -18,6 +18,8 @@ import { GetReportFlagsQueryDto } from './dto/get-report-flags-query.dto';
 import { GetReportFlagsResponseDto } from './dto/get-report-flags-response.dto';
 import { ResolveReportFlagDto } from './dto/resolve-report-flag.dto';
 import { ReportFlagResponseDto } from 'src/reports/dto/report-flag-response.dto';
+import { GetAdminUsersQueryDto } from './dto/get-admin-users-query.dto';
+import { GetAdminUsersResponseDto } from './dto/get-admin-users-response.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -74,6 +76,13 @@ export class AdminController {
     @Body() body: UpdateCategoryDto,
   ): Promise<CategoryResponseDto> {
     return this.adminService.updateCategory(id, body);
+  }
+
+  @Get('users')
+  @ApiOperation({ summary: 'Listar usuarios del sistema' })
+  @ApiOkResponse({ type: GetAdminUsersResponseDto })
+  async listUsers(@Query() query: GetAdminUsersQueryDto): Promise<GetAdminUsersResponseDto> {
+    return this.adminService.listUsers(query);
   }
 
   @Post('users/:id/block')

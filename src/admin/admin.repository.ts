@@ -119,6 +119,67 @@ export class AdminRepository {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  async listUsers(params: {
+    is_blocked?: boolean;
+    search?: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ items: RowDataPacket[]; total: number; counts: { total: number; blocked: number; active: number } }> {
+    const conditions: string[] = [];
+    const values: any[] = [];
+
+    if (params.is_blocked !== undefined) {
+      conditions.push('is_blocked = ?');
+      values.push(params.is_blocked ? 1 : 0);
+    }
+
+    if (params.search) {
+      conditions.push('(email LIKE ? OR username LIKE ? OR first_name LIKE ? OR last_name LIKE ?)');
+      const searchPattern = `%${params.search}%`;
+      values.push(searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Ensure limit and offset are valid integers
+    const safeLimit = Number.isFinite(params.limit) && params.limit > 0 ? Math.floor(params.limit) : 20;
+    const safeOffset = Number.isFinite(params.offset) && params.offset >= 0 ? Math.floor(params.offset) : 0;
+
+    const query = `SELECT id, email, username, first_name, last_name, phone_number, role, is_blocked,
+              blocked_at, blocked_reason, blocked_by, created_at, updated_at
+       FROM users
+       ${whereClause}
+       ORDER BY created_at DESC
+       LIMIT ${safeLimit} OFFSET ${safeOffset}`;
+
+    const [items] = values.length > 0
+      ? await this.dbService.getPool().execute<RowDataPacket[]>(query, values)
+      : await this.dbService.getPool().query<RowDataPacket[]>(query);
+
+    const countQuery = `SELECT COUNT(*) as total FROM users ${whereClause}`;
+    const [[{ total }]] = values.length > 0
+      ? await this.dbService.getPool().execute<RowDataPacket[]>(countQuery, values)
+      : await this.dbService.getPool().query<RowDataPacket[]>(countQuery);
+
+    const [[counts]] = await this.dbService.getPool().query<RowDataPacket[]>(
+      `SELECT
+         COUNT(*) as total,
+         SUM(CASE WHEN is_blocked = 1 THEN 1 ELSE 0 END) as blocked,
+         SUM(CASE WHEN is_blocked = 0 THEN 1 ELSE 0 END) as active
+       FROM users`,
+    );
+
+    return {
+      items,
+      total: Number(total),
+      counts: {
+        total: Number(counts.total || 0),
+        blocked: Number(counts.blocked || 0),
+        active: Number(counts.active || 0),
+      },
+    };
+  }
+
   async blockUser(userId: number, adminId: number, reason?: string): Promise<boolean> {
     const sql = `
       UPDATE users
@@ -231,12 +292,12 @@ export class AdminRepository {
       SELECT id, name, slug, reports_count AS reportsCount, search_count AS searchCount
       FROM categories
       ORDER BY reports_count DESC, search_count DESC
-      LIMIT CAST(? AS UNSIGNED)
+      LIMIT ${safeLimit}
     `;
 
     const [rows] = await this.dbService
       .getPool()
-      .execute<RowDataPacket[]>(sql, [safeLimit]);
+      .query<RowDataPacket[]>(sql);
 
     return rows;
   }
@@ -273,12 +334,12 @@ export class AdminRepository {
         GROUP BY rr.publisher_host
       ) AS totals ON totals.host = approved.host
       ORDER BY approved.approvedReportsCount DESC, COALESCE(totals.totalReportsCount, 0) DESC
-      LIMIT CAST(? AS UNSIGNED)
+      LIMIT ${safeLimit}
     `;
 
     const [rows] = await this.dbService
       .getPool()
-      .execute<RowDataPacket[]>(sql, [safeLimit]);
+      .query<RowDataPacket[]>(sql);
 
     return rows;
   }
