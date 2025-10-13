@@ -34,3 +34,5 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         return this.pool;
     }
 }
+
+/* CREAR .ENV*/
