@@ -80,6 +80,8 @@ export interface ApprovedReportWithRelationsRow {
   authorFirstName: string | null;
   authorLastName: string | null;
   authorUsername: string | null;
+  reviewNotes: string | null;
+  rejectionReasonText: string | null;
 }
 
 export interface ReportMediaRow {
@@ -157,40 +159,58 @@ export class ReportRepository {
   }
 
   async findApprovedReportWithRelations(reportId: number): Promise<ApprovedReportWithRelationsRow | undefined> {
-    const [rows] = await this.dbService
-      .getPool()
-      .query<RowDataPacket[]>(
-        `SELECT
-           r.id AS report_id,
-           r.status,
-           r.category_id,
-           c.name AS category_name,
-           c.slug AS category_slug,
-           r.rating_average,
-           r.rating_count,
-           r.published_at,
-           r.approved_at,
-           r.created_at,
-           rr.id AS revision_id,
-           rr.title,
-           rr.description,
-           rr.incident_url,
-           rr.publisher_host,
-           r.is_anonymous,
-           u.id AS author_id,
-           u.first_name AS author_first_name,
-           u.last_name AS author_last_name,
-           u.username AS author_username
-         FROM reports r
-         INNER JOIN report_revisions rr ON rr.id = r.current_revision_id
-         LEFT JOIN categories c ON c.id = r.category_id
-         LEFT JOIN users u ON u.id = r.author_id
-         WHERE r.id = ?
-           AND r.status = 'approved'
-           AND r.deleted_at IS NULL
-         LIMIT 1`,
-        [reportId],
-      );
+    return this.fetchReportWithRelations(reportId, 'approved');
+  }
+
+  async findReportWithRelations(reportId: number): Promise<ApprovedReportWithRelationsRow | undefined> {
+    return this.fetchReportWithRelations(reportId);
+  }
+
+  private async fetchReportWithRelations(
+    reportId: number,
+    status?: ReportStatus,
+  ): Promise<ApprovedReportWithRelationsRow | undefined> {
+    const conditions: string[] = ['r.id = ?', 'r.deleted_at IS NULL'];
+    const params: Array<number | string> = [reportId];
+
+    if (status) {
+      conditions.push('r.status = ?');
+      params.push(status);
+    }
+
+    const query = `
+      SELECT
+        r.id AS report_id,
+        r.status,
+        r.category_id,
+        c.name AS category_name,
+        c.slug AS category_slug,
+        r.rating_average,
+        r.rating_count,
+        r.published_at,
+        r.approved_at,
+        r.created_at,
+        rr.id AS revision_id,
+        rr.title,
+        rr.description,
+        rr.incident_url,
+        rr.publisher_host,
+        r.is_anonymous,
+        u.id AS author_id,
+        u.first_name AS author_first_name,
+        u.last_name AS author_last_name,
+        u.username AS author_username,
+        r.review_notes,
+        r.rejection_reason_text
+      FROM reports r
+      INNER JOIN report_revisions rr ON rr.id = r.current_revision_id
+      LEFT JOIN categories c ON c.id = r.category_id
+      LEFT JOIN users u ON u.id = r.author_id
+      WHERE ${conditions.join(' AND ')}
+      LIMIT 1
+    `;
+
+    const [rows] = await this.dbService.getPool().query<RowDataPacket[]>(query, params);
 
     const row = (rows as unknown as Array<{
       report_id: number;
@@ -213,6 +233,8 @@ export class ReportRepository {
       author_first_name: string | null;
       author_last_name: string | null;
       author_username: string | null;
+      review_notes: string | null;
+      rejection_reason_text: string | null;
     }>)[0];
 
     if (!row) {
@@ -240,6 +262,8 @@ export class ReportRepository {
       authorFirstName: row.author_first_name,
       authorLastName: row.author_last_name,
       authorUsername: row.author_username,
+      reviewNotes: row.review_notes ?? null,
+      rejectionReasonText: row.rejection_reason_text ?? null,
     };
   }
 

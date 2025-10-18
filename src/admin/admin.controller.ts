@@ -13,6 +13,7 @@ import { MetricsTopCategoryDto } from './dto/metrics-top-category.dto';
 import { MetricsTopHostDto } from './dto/metrics-top-host.dto';
 import { GetAdminReportsQueryDto } from './dto/get-admin-reports-query.dto';
 import { GetAdminReportsResponseDto } from './dto/get-admin-reports-response.dto';
+import { AdminReportDetailDto } from './dto/admin-report-detail.dto';
 
 import { GetReportFlagsQueryDto } from './dto/get-report-flags-query.dto';
 import { GetReportFlagsResponseDto } from './dto/get-report-flags-response.dto';
@@ -33,6 +34,13 @@ export class AdminController {
   @ApiOkResponse({ type: GetAdminReportsResponseDto })
   async listReports(@Query() query: GetAdminReportsQueryDto): Promise<GetAdminReportsResponseDto> {
     return this.adminService.listReports(query);
+  }
+
+  @Get('reports/:id')
+  @ApiOperation({ summary: 'Obtener detalle de un reporte' })
+  @ApiOkResponse({ type: AdminReportDetailDto })
+  async getReportDetail(@Param('id', ParseIntPipe) id: number): Promise<AdminReportDetailDto> {
+    return this.adminService.getReportDetail(id);
   }
 
   @Get('report-flags')
@@ -147,3 +155,5 @@ export class AdminController {
     return this.adminService.getTopHosts(sanitizedLimit);
   }
 }
+
+

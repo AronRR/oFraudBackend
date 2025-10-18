@@ -20,6 +20,7 @@ import { ResolveReportFlagDto } from './dto/resolve-report-flag.dto';
 import { ReportFlagResponseDto } from 'src/reports/dto/report-flag-response.dto';
 import { GetAdminUsersQueryDto } from './dto/get-admin-users-query.dto';
 import { GetAdminUsersResponseDto, AdminUserDto } from './dto/get-admin-users-response.dto';
+import { AdminReportDetailDto } from './dto/admin-report-detail.dto';
 
 @Injectable()
 export class AdminService {
@@ -73,6 +74,63 @@ export class AdminService {
     };
   }
 
+  async getReportDetail(reportId: number): Promise<AdminReportDetailDto> {
+    const report = await this.reportRepository.findReportWithRelations(reportId);
+    if (!report) {
+      throw new NotFoundException('Reporte no encontrado');
+    }
+
+    const media = await this.reportRepository.listMediaByRevision(report.revisionId);
+
+    const category = report.categoryId
+      ? {
+          id: report.categoryId,
+          name: report.categoryName ?? null,
+          slug: report.categorySlug ?? null,
+        }
+      : null;
+
+    let displayName = '';
+    if (report.authorFirstName?.trim()) {
+      displayName = report.authorFirstName.trim();
+    }
+    if (report.authorLastName?.trim()) {
+      displayName = displayName
+        ? `${displayName} ${report.authorLastName.trim()}`.trim()
+        : report.authorLastName.trim();
+    }
+    if (!displayName && report.authorUsername?.trim()) {
+      displayName = report.authorUsername.trim();
+    }
+
+    return {
+      status: report.status,
+      reportId: report.reportId,
+      title: report.title ?? null,
+      description: report.description,
+      incidentUrl: report.incidentUrl,
+      publisherHost: report.publisherHost,
+      createdAt: report.createdAt.toISOString(),
+      approvedAt: report.approvedAt ? report.approvedAt.toISOString() : null,
+      publishedAt: report.publishedAt ? report.publishedAt.toISOString() : null,
+      category,
+      author: {
+        isAnonymous: report.isAnonymous,
+        authorId: report.authorId,
+        displayName: displayName || null,
+      },
+      media: media.map((item) => ({
+        mediaId: item.mediaId,
+        fileUrl: item.fileUrl,
+        mediaType: item.mediaType,
+        position: item.position,
+      })),
+      ratingAverage: report.ratingAverage ? Number(report.ratingAverage) : 0,
+      ratingCount: Number(report.ratingCount ?? 0),
+      reviewNotes: report.reviewNotes ?? null,
+      rejectionReasonText: report.rejectionReasonText ?? null,
+    };
+  }
   async listReportFlags(query: GetReportFlagsQueryDto): Promise<GetReportFlagsResponseDto> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -326,4 +384,6 @@ export class AdminService {
     };
   }
 }
+
+
 
