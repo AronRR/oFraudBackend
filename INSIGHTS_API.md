@@ -1,6 +1,6 @@
-# 📊 API de Insights Públicos - Ofraud
+# 📊 Insights API - Endpoints Públicos
 
-Este módulo proporciona endpoints públicos para consultar estadísticas y contenido educativo sobre fraudes.
+La API de Insights proporciona endpoints públicos (sin autenticación) para consultar estadísticas y contenido educativo sobre fraudes. Estos endpoints están diseñados para ser consumidos por aplicaciones móviles y frontends públicos.
 
 ---
 
@@ -12,16 +12,21 @@ Este módulo proporciona endpoints públicos para consultar estadísticas y cont
 
 Obtiene los sitios web/dominios con más reportes en un período específico.
 
-#### Query Parameters:
-- `period` (opcional): `weekly` | `monthly` (default: `weekly`)
-- `limit` (opcional): Número de resultados (default: `10`, máx: `50`)
+#### Query Parameters
 
-#### Ejemplo de Request:
-```http
-GET /insights/top-hosts?period=weekly&limit=5
+| Parámetro | Tipo | Requerido | Valores | Default | Descripción |
+|-----------|------|-----------|---------|---------|-------------|
+| `period` | string | No | `weekly`, `monthly` | `weekly` | Período de tiempo |
+| `limit` | number | No | 1-50 | `10` | Número de resultados |
+
+#### Ejemplo de Request
+
+```bash
+curl "http://localhost:3000/insights/top-hosts?period=weekly&limit=5"
 ```
 
-#### Ejemplo de Response:
+#### Ejemplo de Response
+
 ```json
 [
   {
@@ -47,15 +52,20 @@ GET /insights/top-hosts?period=weekly&limit=5
 
 Lista las categorías con mayor actividad (reportes + búsquedas).
 
-#### Query Parameters:
-- `limit` (opcional): Número de resultados (default: `10`, máx: `50`)
+#### Query Parameters
 
-#### Ejemplo de Request:
-```http
-GET /insights/top-categories?limit=3
+| Parámetro | Tipo | Requerido | Valores | Default | Descripción |
+|-----------|------|-----------|---------|---------|-------------|
+| `limit` | number | No | 1-50 | `10` | Número de resultados |
+
+#### Ejemplo de Request
+
+```bash
+curl "http://localhost:3000/insights/top-categories?limit=3"
 ```
 
-#### Ejemplo de Response:
+#### Ejemplo de Response
+
 ```json
 [
   {
@@ -85,12 +95,14 @@ GET /insights/top-categories?limit=3
 
 Devuelve métricas generales del sistema.
 
-#### Ejemplo de Request:
-```http
-GET /insights/fraud-stats
+#### Ejemplo de Request
+
+```bash
+curl "http://localhost:3000/insights/fraud-stats"
 ```
 
-#### Ejemplo de Response:
+#### Ejemplo de Response
+
 ```json
 {
   "averageDetectionDays": 28,
@@ -110,12 +122,14 @@ GET /insights/fraud-stats
 
 Lista todos los temas educativos disponibles.
 
-#### Ejemplo de Request:
-```http
-GET /insights/educational
+#### Ejemplo de Request
+
+```bash
+curl "http://localhost:3000/insights/educational"
 ```
 
-#### Ejemplo de Response:
+#### Ejemplo de Response
+
 ```json
 [
   {
@@ -149,20 +163,27 @@ GET /insights/educational
 
 Devuelve información detallada sobre un tema específico.
 
-#### Path Parameters:
-- `topic`: Uno de los siguientes valores:
-  - `phishing`
-  - `what-to-do`
-  - `preventive-tips`
-  - `identity-theft`
-  - `detection-time`
+#### Path Parameters
 
-#### Ejemplo de Request:
-```http
-GET /insights/educational/phishing
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `topic` | string | ID del tema educativo |
+
+**Temas disponibles:**
+- `phishing` - ¿Qué es el phishing?
+- `what-to-do` - ¿Qué hacer si fui víctima?
+- `preventive-tips` - Consejos preventivos
+- `identity-theft` - Robo de identidad
+- `detection-time` - Tiempo de detección en México
+
+#### Ejemplo de Request: Phishing
+
+```bash
+curl "http://localhost:3000/insights/educational/phishing"
 ```
 
-#### Ejemplo de Response:
+#### Ejemplo de Response
+
 ```json
 {
   "topic": "phishing",
@@ -181,15 +202,14 @@ GET /insights/educational/phishing
 }
 ```
 
----
+#### Ejemplo de Request: Qué Hacer
 
-### Ejemplo de Request completo con "what-to-do":
-
-```http
-GET /insights/educational/what-to-do
+```bash
+curl "http://localhost:3000/insights/educational/what-to-do"
 ```
 
-#### Response:
+#### Ejemplo de Response
+
 ```json
 {
   "topic": "what-to-do",
@@ -215,81 +235,230 @@ GET /insights/educational/what-to-do
 
 ---
 
-## 🎯 Casos de Uso en la App Móvil
+## 💡 Casos de Uso
 
-### Pantalla de Insights (Página 7 del Mockup)
-
-```typescript
-// Obtener top hosts semanales
-const topHosts = await fetch('/insights/top-hosts?period=weekly&limit=3');
-
-// Obtener top categorías
-const topCategories = await fetch('/insights/top-categories?limit=3');
-
-// Mostrar estadística de detección
-const stats = await fetch('/insights/fraud-stats');
-console.log(`Tiempo promedio: ${stats.averageDetectionDays} días`);
-```
-
-### Pantalla de Categorías (Página 9 del Mockup)
+### Aplicación Móvil - Pantalla de Insights
 
 ```typescript
-// Obtener categorías más buscadas y reportadas
-const categories = await fetch('/insights/top-categories?limit=6');
-```
+// Obtener datos para dashboard de insights
+async function loadInsightsData() {
+  const [topHosts, topCategories, stats] = await Promise.all([
+    fetch('/insights/top-hosts?period=weekly&limit=3'),
+    fetch('/insights/top-categories?limit=3'),
+    fetch('/insights/fraud-stats')
+  ]);
 
-### Pantalla Educativa (Páginas 11-13 del Mockup)
-
-```typescript
-// Obtener contenido de phishing
-const phishingInfo = await fetch('/insights/educational/phishing');
-
-// Obtener qué hacer si fui víctima
-const fraudVictimInfo = await fetch('/insights/educational/what-to-do');
-
-// Obtener consejos preventivos
-const preventiveTips = await fetch('/insights/educational/preventive-tips');
-```
-
----
-
-## 📝 Notas Importantes
-
-1. **Todos los endpoints son públicos** - No requieren autenticación
-2. **Límites de resultados** - Máximo 50 items por request
-3. **Caché recomendado** - Los datos cambian periódicamente, se puede cachear por 1 hora
-4. **Contenido educativo estático** - Definido en `src/insights/content/educational-content.json`
-
----
-
-## 🔄 Agregar Nuevo Contenido Educativo
-
-Para agregar un nuevo tema educativo, edita el archivo:
-```
-src/insights/content/educational-content.json
-```
-
-Ejemplo de nueva entrada:
-```json
-{
-  "nuevo-tema": {
-    "topic": "nuevo-tema",
-    "title": "Título del Nuevo Tema",
-    "description": "Descripción detallada...",
-    "tips": [
-      {
-        "icon": "💡",
-        "text": "Consejo útil aquí"
-      }
-    ]
-  }
+  return {
+    topHosts: await topHosts.json(),
+    topCategories: await topCategories.json(),
+    stats: await stats.json()
+  };
 }
 ```
 
-No olvides actualizar el enum en el controller:
+### Aplicación Móvil - Sección Educativa
+
 ```typescript
-@ApiParam({
-  name: 'topic',
-  enum: ['phishing', 'what-to-do', 'preventive-tips', 'identity-theft', 'detection-time', 'nuevo-tema'],
-})
+// Cargar lista de temas
+const topics = await fetch('/insights/educational').then(r => r.json());
+
+// Cargar detalle de un tema específico
+const phishingInfo = await fetch('/insights/educational/phishing')
+  .then(r => r.json());
 ```
+
+### Frontend Web - Página de Estadísticas
+
+```javascript
+// React/Vue/Angular example
+useEffect(() => {
+  async function fetchStats() {
+    const response = await fetch('http://localhost:3000/insights/fraud-stats');
+    const data = await response.json();
+    setStats(data);
+  }
+
+  fetchStats();
+}, []);
+```
+
+---
+
+## 📊 Estructura de Datos
+
+### TopHostDto
+
+```typescript
+interface TopHostDto {
+  host: string;              // Dominio reportado
+  reportCount: number;       // Cantidad de reportes
+  averageRating: number;     // Rating promedio (1-5)
+  totalRatings: number;      // Cantidad de calificaciones
+}
+```
+
+### TopCategoryDto
+
+```typescript
+interface TopCategoryDto {
+  id: number;                // ID de la categoría
+  name: string;              // Nombre de la categoría
+  slug: string;              // Slug para URLs
+  reportsCount: number;      // Cantidad de reportes
+  searchCount: number;       // Cantidad de búsquedas
+  totalActivity: number;     // reportes + búsquedas
+}
+```
+
+### FraudStatsDto
+
+```typescript
+interface FraudStatsDto {
+  averageDetectionDays: number;    // Días promedio de detección
+  totalReportsApproved: number;    // Total de reportes aprobados
+  reportsThisWeek: number;         // Reportes esta semana
+  reportsThisMonth: number;        // Reportes este mes
+  totalActiveUsers: number;        // Usuarios activos
+  categoriesCount: number;         // Cantidad de categorías
+}
+```
+
+### EducationalContentDto
+
+```typescript
+interface EducationalContentDto {
+  topic: string;                    // ID del tema
+  title: string;                    // Título
+  description: string;              // Descripción principal
+  tips?: Array<{                    // Consejos (opcional)
+    icon: string;
+    text: string;
+  }>;
+  steps?: Array<{                   // Pasos (opcional)
+    title: string;
+    description: string;
+  }>;
+  additionalInfo?: string;          // Información adicional (opcional)
+}
+```
+
+---
+
+## 🔒 Seguridad y Limitaciones
+
+### Rate Limiting
+
+Todos los endpoints públicos están limitados a:
+- **60 requests por minuto** por IP
+
+Si excedes el límite, recibirás un error `429 Too Many Requests`.
+
+### Caché Recomendado
+
+Los datos de insights cambian con poca frecuencia. Recomendaciones de caché:
+
+| Endpoint | Tiempo de Caché Recomendado |
+|----------|----------------------------|
+| `/insights/top-hosts` | 1 hora |
+| `/insights/top-categories` | 1 hora |
+| `/insights/fraud-stats` | 30 minutos |
+| `/insights/educational` | 24 horas |
+| `/insights/educational/:topic` | 24 horas |
+
+---
+
+## 🛠️ Personalización
+
+### Agregar Nuevo Tema Educativo
+
+1. Edita el archivo de contenido:
+   ```
+   src/insights/content/educational-content.json
+   ```
+
+2. Agrega una nueva entrada:
+   ```json
+   {
+     "nuevo-tema": {
+       "topic": "nuevo-tema",
+       "title": "Título del Nuevo Tema",
+       "description": "Descripción detallada...",
+       "tips": [
+         {
+           "icon": "💡",
+           "text": "Consejo útil aquí"
+         }
+       ]
+     }
+   }
+   ```
+
+3. Actualiza el enum en el controller:
+   ```typescript
+   // src/insights/insights.controller.ts
+   @ApiParam({
+     name: 'topic',
+     enum: ['phishing', 'what-to-do', 'preventive-tips', 'identity-theft', 'detection-time', 'nuevo-tema'],
+   })
+   ```
+
+---
+
+## 📝 Notas Técnicas
+
+- **No requiere autenticación**: Todos los endpoints son públicos
+- **Límite de resultados**: Máximo 50 items por request en endpoints con paginación
+- **Formato**: Todas las responses son JSON
+- **Charset**: UTF-8
+- **CORS**: Configurado para permitir requests desde cualquier origen
+
+---
+
+## 🐛 Manejo de Errores
+
+### Error 404 - Not Found
+
+```json
+{
+  "statusCode": 404,
+  "message": "Topic not found",
+  "error": "Not Found"
+}
+```
+
+**Causa**: El topic educativo solicitado no existe.
+
+### Error 429 - Too Many Requests
+
+```json
+{
+  "statusCode": 429,
+  "message": "ThrottlerException: Too Many Requests"
+}
+```
+
+**Causa**: Excediste el rate limit de 60 requests/minuto.
+
+**Solución**: Espera 1 minuto antes de hacer más requests.
+
+### Error 400 - Bad Request
+
+```json
+{
+  "statusCode": 400,
+  "message": ["limit must not be greater than 50"],
+  "error": "Bad Request"
+}
+```
+
+**Causa**: Los query parameters son inválidos.
+
+**Solución**: Verifica que los parámetros cumplan con las restricciones.
+
+---
+
+## 📚 Recursos Adicionales
+
+- **Documentación Swagger**: `http://localhost:3000/docs`
+- **Modelo de Datos**: Ver [database-model.md](./database-model.md)
+- **Guía de Instalación**: Ver [README.md](./README.md)

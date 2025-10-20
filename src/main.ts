@@ -9,13 +9,13 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Enable CORS for frontend
   app.enableCors({
     origin: [
       'http://localhost:5173',
       'http://127.0.0.1:5173',
       'http://localhost:5174',
       'http://127.0.0.1:5174',
+      
     ],
     credentials: true,
   });
@@ -37,12 +37,12 @@ async function bootstrap() {
     .build();
   const doc = SwaggerModule.createDocument(app, config);
 
-  // Swagger UI clásico (puedes dejarlo o quitarlo)
+
   SwaggerModule.setup('docs', app, doc, {
     jsonDocumentUrl: '/docs-json',
   });
 
-  // Scalar - Documentación moderna
+
   const { apiReference } = await import('@scalar/nestjs-api-reference');
   app.use(
     '/reference',

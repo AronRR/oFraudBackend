@@ -1,147 +1,543 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# oFraud API - Sistema de Reportes de Fraude
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API backend para la plataforma oFraud, un sistema de gestión y moderación de reportes de fraude en línea con interacción comunitaria.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 🚀 Características Principales
 
-## Description
+- **Sistema de Reportes con Versionado**: Los usuarios pueden reportar fraudes con evidencia multimedia
+- **Moderación Administrativa**: Panel completo para aprobar/rechazar reportes con trazabilidad
+- **Interacción Comunitaria**: Calificaciones, comentarios y sistema de alertas
+- **Autenticación JWT**: Sistema seguro con refresh tokens y auditoría
+- **API Pública de Insights**: Estadísticas y contenido educativo sobre fraudes
+- **Gestión de Usuarios**: Control de acceso, bloqueos y auditoría de seguridad
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## 📋 Requisitos Previos
+
+Antes de comenzar, asegúrate de tener instalado:
+
+- **Node.js**: v18.x o superior ([Descargar](https://nodejs.org/))
+- **MySQL**: v8.0 o superior ([Descargar](https://dev.mysql.com/downloads/mysql/))
+- **npm**: v9.x o superior (incluido con Node.js)
+
+Para verificar las versiones instaladas:
 
 ```bash
-$ npm install
+node --version
+npm --version
+mysql --version
 ```
 
-## Environment variables
+---
 
-Create a `.env` file based on the provided `.env.example` to configure the database connection that backs the application.
+## 🛠️ Instalación
 
-| Variable | Description | Default |
-| --- | --- | --- |
-| `DB_HOST` | Hostname or IP address of the MySQL server. | `localhost` |
-| `DB_PORT` | TCP port where the MySQL server listens. | `3306` |
-| `DB_USER` | Username used to authenticate against MySQL. | `root` |
-| `DB_PASSWORD` | Password for the configured MySQL user. | _(empty)_ |
-| `DB_NAME` | Database schema that stores the oFraud tables. | `ofraud` |
-
-## Compile and run the project
+### 1. Clonar el Repositorio
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+git clone <repository-url>
+cd oFraudClean
 ```
 
-## Admin dashboard (React)
-
-The repository now includes a Vite + React dashboard inside the `frontend/` directory to help administrators moderate
-fraud reports and track key indicators exposed by the API.
+### 2. Instalar Dependencias
 
 ```bash
-cd frontend
 npm install
-npm run dev
 ```
 
-By default the dashboard expects the API to be available at `http://localhost:3000`. You can override that origin by
-creating a `.env` file in `frontend/` with a `VITE_API_BASE_URL` entry, for example:
+Esto instalará todas las dependencias necesarias especificadas en `package.json`.
+
+### 3. Configurar Base de Datos
+
+#### a) Crear la Base de Datos MySQL
+
+Conéctate a MySQL:
 
 ```bash
-VITE_API_BASE_URL=https://api.ofraud.test
+mysql -u root -p
 ```
 
-### Dashboard features
+Crea la base de datos:
 
-- **Authentication**: Admins can log in with their credentials. The dashboard stores and refreshes access tokens
-  transparently using the `/auth/login`, `/auth/profile`, and `/auth/refresh` endpoints.
-- **Overview**: Visualize system metrics such as report totals, moderation workload, and the top categories/hosts sourced
-  from `/admin/metrics/*` and `/insights/fraud-stats`.
-- **Report moderation**: Review, approve, reject, or remove community reports through `/admin/reports` and
-  `/reports/moderate`.
-- **Community alerts**: Validate or dismiss report flags using `/admin/report-flags` and `/admin/report-flags/:id`.
-- **Category management**: Create or edit report categories with `/admin/categories`.
+```sql
+CREATE DATABASE ofraud CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+EXIT;
+```
 
-## Run tests
+#### b) Configurar Variables de Entorno
+
+Crea un archivo `.env` en la raíz del proyecto:
 
 ```bash
-# unit tests
-$ npm run test
+# Windows
+copy .env.example .env
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# Linux/Mac
+cp .env.example .env
 ```
 
-## Deployment
+Edita el archivo `.env` con tus credenciales de MySQL:
 
-All environments **must** be provisioned through the versioned migration scripts stored in the `migrations/` directory. This keeps the database schema consistent between development, staging, and production.
+```env
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=tu_password_aqui
+DB_NAME=ofraud
 
-1. Configure the database connection by exporting the `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME` variables (the defaults in `.env.example` target `localhost:3306` and database `ofraud`).
-2. Apply migrations in chronological order using `ts-node` or `tsx`. For example:
+# JWT Configuration
+JWT_SECRET=tu_secret_key_super_seguro_aqui_cambiar_en_produccion
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_SECRET=tu_refresh_secret_super_seguro_aqui
+JWT_REFRESH_EXPIRES_IN=7d
 
-   ```bash
-   npx ts-node migrations/202412010000_init_schema.ts up
-   npx ts-node migrations/202412050000_rehash_passwords_with_bcrypt.ts
-   npx ts-node migrations/202412060001_create_user_audit_tables.ts
-   ```
+# Server Configuration
+PORT=3000
+```
 
-   The initial migration accepts a `down` argument to destroy the schema when you need a clean database:
+**⚠️ IMPORTANTE**:
+- Cambia `JWT_SECRET` y `JWT_REFRESH_SECRET` por valores únicos y seguros en producción
+- Nunca compartas estos valores ni los subas a repositorios públicos
 
-   ```bash
-   npx ts-node migrations/202412010000_init_schema.ts down
-   ```
+#### c) Ejecutar Migraciones
 
-3. Deploy the NestJS application only after the required migrations have been executed successfully.
+Las migraciones crean todas las tablas y estructuras necesarias en la base de datos.
 
-## Resources
+```bash
+# Migración 1: Crear schema inicial (tablas base)
+npx ts-node migrations/202412010000_init_schema.ts up
 
-Check out a few resources that may come in handy when working with NestJS:
+# Migración 2: Actualizar a bcrypt para passwords
+npx ts-node migrations/202412050000_rehash_passwords_with_bcrypt.ts
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+# Migración 3: Crear tablas de auditoría
+npx ts-node migrations/202412060001_create_user_audit_tables.ts
+```
 
-## Support
+**Verificar que las tablas se crearon correctamente:**
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```bash
+mysql -u root -p ofraud -e "SHOW TABLES;"
+```
 
-## Stay in touch
+Deberías ver 16 tablas listadas.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
 
-## License
+## ▶️ Ejecutar la Aplicación
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### Modo Desarrollo (con hot-reload)
+
+```bash
+npm run start:dev
+```
+
+La API estará disponible en: `http://localhost:3000`
+
+### Modo Producción
+
+```bash
+# Compilar el proyecto
+npm run build
+
+# Ejecutar en producción
+npm run start:prod
+```
+
+### Modo Debug
+
+```bash
+npm run start:debug
+```
+
+---
+
+## 📚 Documentación de la API
+
+Una vez que la aplicación esté ejecutándose, puedes acceder a la documentación interactiva:
+
+### Swagger UI (Recomendado)
+```
+http://localhost:3000/docs
+```
+
+Interfaz completa con ejemplos de requests/responses, autenticación y pruebas en vivo.
+
+### Scalar API Reference (Moderna)
+```
+http://localhost:3000/reference
+```
+
+Documentación moderna con mejor experiencia de usuario.
+
+### JSON Schema
+```
+http://localhost:3000/docs-json
+```
+
+Esquema OpenAPI en formato JSON para herramientas de terceros.
+
+---
+
+## 🧪 Ejecutar Tests
+
+### Tests Unitarios
+
+```bash
+npm run test
+```
+
+### Tests con Modo Watch (desarrollo)
+
+```bash
+npm run test:watch
+```
+
+### Cobertura de Tests
+
+```bash
+npm run test:cov
+```
+
+Los reportes de cobertura se generarán en la carpeta `coverage/`.
+
+### Tests End-to-End
+
+```bash
+npm run test:e2e
+```
+
+---
+
+## 🔐 Primeros Pasos - Crear Usuario Administrador
+
+Para poder usar el sistema, necesitas crear un usuario administrador:
+
+### Opción 1: Vía MySQL Directamente
+
+```sql
+USE ofraud;
+
+INSERT INTO users (
+  email,
+  username,
+  first_name,
+  last_name,
+  password_hash,
+  password_salt,
+  role,
+  created_at,
+  updated_at
+) VALUES (
+  'admin@ofraud.com',
+  'admin',
+  'Admin',
+  'Sistema',
+  '$2b$10$YourHashedPasswordHere',  -- Ver instrucción abajo
+  'salt_placeholder',
+  'admin',
+  NOW(),
+  NOW()
+);
+```
+
+**Para generar el password hash**, usa este script Node.js:
+
+```bash
+node -e "const bcrypt = require('bcrypt'); bcrypt.hash('tu_password', 10).then(hash => console.log(hash));"
+```
+
+### Opción 2: Vía API (Recomendado para producción)
+
+1. Crea un usuario normal primero:
+```bash
+curl -X POST http://localhost:3000/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@ofraud.com",
+    "username": "admin",
+    "firstName": "Admin",
+    "lastName": "Sistema",
+    "password": "tu_password_seguro",
+    "phoneNumber": "+52123456789"
+  }'
+```
+
+2. Actualiza el rol a admin en MySQL:
+```sql
+UPDATE users SET role = 'admin' WHERE email = 'admin@ofraud.com';
+```
+
+---
+
+## 🔑 Autenticación
+
+### Login
+
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@ofraud.com",
+    "password": "tu_password"
+  }'
+```
+
+Respuesta:
+```json
+{
+  "message": "Inicio de sesión exitoso",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "long_random_string..."
+}
+```
+
+### Usar el Access Token
+
+En todas las peticiones protegidas, incluye el header:
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Renovar Access Token
+
+```bash
+curl -X POST http://localhost:3000/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refreshToken": "tu_refresh_token"
+  }'
+```
+
+---
+
+## 📡 Endpoints Principales
+
+### Públicos (Sin autenticación)
+
+- `GET /insights/top-hosts` - Sitios más reportados
+- `GET /insights/top-categories` - Categorías más activas
+- `GET /insights/fraud-stats` - Estadísticas generales
+- `GET /insights/educational` - Lista de temas educativos
+- `GET /insights/educational/:topic` - Contenido educativo específico
+- `GET /reports` - Feed de reportes aprobados
+- `GET /reports/:id` - Detalle de reporte específico
+- `GET /categories` - Lista de categorías
+
+### Autenticados (Requieren login)
+
+- `POST /reports` - Crear nuevo reporte
+- `PUT /reports/:id` - Editar reporte propio
+- `DELETE /reports/:id` - Eliminar reporte propio
+- `POST /reports/:id/ratings` - Calificar reporte
+- `POST /reports/:id/comments` - Comentar en reporte
+- `POST /reports/:id/flags` - Alertar reporte problemático
+- `GET /users/me` - Obtener perfil propio
+- `PUT /users/me` - Actualizar perfil
+- `PUT /users/me/password` - Cambiar contraseña
+
+### Administrativos (Requieren rol admin)
+
+- `GET /admin/reports` - Cola de moderación
+- `GET /admin/reports/:id` - Detalle para moderación
+- `POST /reports/:id/moderate` - Aprobar/Rechazar reporte
+- `DELETE /admin/reports/:id` - Remover reporte
+- `GET /admin/report-flags` - Alertas de comunidad
+- `PUT /admin/report-flags/:id` - Resolver alerta
+- `GET /admin/users` - Gestión de usuarios
+- `POST /admin/users/:id/block` - Bloquear usuario
+- `POST /admin/users/:id/unblock` - Desbloquear usuario
+- `GET /admin/categories` - CRUD de categorías
+- `GET /admin/metrics/overview` - Métricas del sistema
+- `GET /admin/metrics/top-categories` - Top categorías
+- `GET /admin/metrics/top-hosts` - Top hosts reportados
+
+Ver documentación completa en `/docs`.
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+oFraudClean/
+├── src/
+│   ├── admin/              # Módulo administrativo
+│   ├── auth/               # Autenticación y tokens
+│   ├── categories/         # Gestión de categorías
+│   ├── common/             # Guards, interfaces, utilidades
+│   ├── config/             # Configuración de la app
+│   ├── db/                 # Servicio de base de datos
+│   ├── files/              # Gestión de archivos
+│   ├── insights/           # Endpoints públicos de stats
+│   ├── reports/            # Core: reportes, ratings, comments
+│   ├── users/              # Gestión de usuarios
+│   ├── util/               # Utilidades (crypto, URLs)
+│   ├── app.module.ts       # Módulo principal
+│   └── main.ts             # Punto de entrada
+├── migrations/             # Migraciones de base de datos
+├── test/                   # Tests end-to-end
+├── public/                 # Archivos estáticos
+├── .env                    # Variables de entorno (NO COMMITEAR)
+├── .env.example            # Ejemplo de configuración
+├── package.json            # Dependencias
+├── tsconfig.json           # Configuración TypeScript
+├── nest-cli.json           # Configuración NestJS
+├── database-model.md       # Documentación del modelo de datos
+├── INSIGHTS_API.md         # Documentación de endpoints públicos
+├── DEPLOYMENT.md           # Guía de deployment
+└── README.md               # Este archivo
+```
+
+---
+
+## 🔧 Scripts Disponibles
+
+```bash
+# Desarrollo
+npm run start           # Iniciar en modo normal
+npm run start:dev       # Iniciar con hot-reload
+npm run start:debug     # Iniciar en modo debug
+
+# Producción
+npm run build           # Compilar para producción
+npm run start:prod      # Ejecutar build de producción
+
+# Testing
+npm run test            # Ejecutar tests unitarios
+npm run test:watch      # Tests en modo watch
+npm run test:cov        # Tests con cobertura
+npm run test:e2e        # Tests end-to-end
+
+# Calidad de código
+npm run lint            # Ejecutar ESLint
+npm run format          # Formatear código con Prettier
+```
+
+---
+
+## 🚀 Despliegue en Producción
+
+Para instrucciones detalladas de deployment en diferentes entornos, consulta [DEPLOYMENT.md](./DEPLOYMENT.md).
+
+### Checklist Pre-Deployment
+
+- [ ] Configurar variables de entorno en servidor
+- [ ] Cambiar `JWT_SECRET` y `JWT_REFRESH_SECRET` por valores únicos
+- [ ] Configurar MySQL en servidor de producción
+- [ ] Ejecutar migraciones en base de datos de producción
+- [ ] Configurar CORS para tu dominio de frontend
+- [ ] Configurar HTTPS/SSL
+- [ ] Establecer límites de rate limiting según tu infraestructura
+- [ ] Configurar backups automáticos de base de datos
+- [ ] Configurar logs y monitoreo
+
+---
+
+## 📖 Documentación Adicional
+
+- **[database-model.md](./database-model.md)**: Modelo completo de base de datos con diagramas
+- **[INSIGHTS_API.md](./INSIGHTS_API.md)**: Documentación detallada de endpoints públicos
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)**: Guía de deployment en producción
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)**: Arquitectura y decisiones de diseño
+
+---
+
+## 🐛 Solución de Problemas
+
+### Error: "Cannot connect to MySQL"
+
+**Causa**: Credenciales incorrectas o MySQL no está ejecutándose.
+
+**Solución**:
+1. Verifica que MySQL esté corriendo: `mysql -u root -p`
+2. Verifica las credenciales en `.env`
+3. Asegúrate de que la base de datos `ofraud` exista
+
+### Error: "Table doesn't exist"
+
+**Causa**: Migraciones no se han ejecutado.
+
+**Solución**:
+```bash
+npx ts-node migrations/202412010000_init_schema.ts up
+npx ts-node migrations/202412050000_rehash_passwords_with_bcrypt.ts
+npx ts-node migrations/202412060001_create_user_audit_tables.ts
+```
+
+### Error: "JWT must be provided"
+
+**Causa**: Falta el token de autorización en la petición.
+
+**Solución**: Incluye el header `Authorization: Bearer <tu_access_token>` en tus requests.
+
+### Error: "Port 3000 already in use"
+
+**Causa**: El puerto ya está ocupado por otra aplicación.
+
+**Solución**:
+```bash
+# Cambiar puerto en .env
+PORT=3001
+
+# O matar el proceso en el puerto 3000
+# Windows
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+
+# Linux/Mac
+lsof -ti:3000 | xargs kill
+```
+
+### Errores en Tests
+
+**Si falla el test de AuthController**:
+```bash
+# Ejecutar solo ese test para ver el error completo
+npm test -- auth.controller.spec.ts
+```
+
+---
+
+## 🤝 Soporte
+
+Para dudas o problemas:
+
+1. Consulta la documentación en `/docs` cuando la app esté corriendo
+2. Revisa los archivos de documentación en este repositorio
+3. Verifica los logs de la aplicación para mensajes de error detallados
+
+---
+
+## 📄 Licencia
+
+Este proyecto es privado y confidencial. Todos los derechos reservados.
+
+---
+
+## 🔄 Changelog
+
+### Version 1.0.0 (Actual)
+- ✅ Sistema completo de reportes con versionado
+- ✅ Panel administrativo con moderación
+- ✅ Sistema de calificaciones y comentarios
+- ✅ Alertas comunitarias (flags)
+- ✅ Autenticación JWT con refresh tokens
+- ✅ API pública de insights y contenido educativo
+- ✅ Auditoría completa de usuarios y reportes
+- ✅ Rate limiting configurado
+- ✅ Documentación Swagger/OpenAPI
+
+---
+
+**¡Listo para usar!** 🎉
+
+Para comenzar:
+1. Verifica que MySQL esté corriendo
+2. Ejecuta `npm install`
+3. Configura `.env`
+4. Ejecuta las migraciones
+5. Ejecuta `npm run start:dev`
+6. Visita `http://localhost:3000/docs`

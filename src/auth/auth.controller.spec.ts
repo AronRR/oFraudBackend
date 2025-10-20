@@ -51,7 +51,14 @@ describe("AuthController", () => {
             tokenService.generateAccess.mockResolvedValue("access-token");
             tokenService.generateRefresh.mockResolvedValue("refresh-token");
 
-            const response = await controller.login({ email: "user@example.com", password: "Passw0rd" });
+            const mockReq = {
+                ip: "127.0.0.1",
+                socket: {
+                    remoteAddress: "127.0.0.1"
+                }
+            };
+
+            const response = await controller.login({ email: "user@example.com", password: "Passw0rd" }, mockReq);
 
             expect(response).toEqual({
                 message: "Inicio de sesión exitoso",
@@ -59,13 +66,20 @@ describe("AuthController", () => {
                 refreshToken: "refresh-token",
             });
             expect(tokenService.generateAccess).toHaveBeenCalledTimes(1);
-            expect(tokenService.generateRefresh).toHaveBeenCalledWith("1");
+            expect(tokenService.generateRefresh).toHaveBeenCalledWith("1", "127.0.0.1");
         });
 
         it("should not issue tokens when the user is blocked", async () => {
             userService.login.mockRejectedValue(new ForbiddenException("Cuenta bloqueada"));
 
-            await expect(controller.login({ email: "user@example.com", password: "Passw0rd" })).rejects.toBeInstanceOf(
+            const mockReq = {
+                ip: "127.0.0.1",
+                socket: {
+                    remoteAddress: "127.0.0.1"
+                }
+            };
+
+            await expect(controller.login({ email: "user@example.com", password: "Passw0rd" }, mockReq)).rejects.toBeInstanceOf(
                 ForbiddenException,
             );
 
@@ -76,7 +90,14 @@ describe("AuthController", () => {
         it("should return unauthorized when the email does not exist", async () => {
             userService.login.mockRejectedValue(new UnauthorizedException("Usuario no encontrado"));
 
-            await expect(controller.login({ email: "missing@example.com", password: "Passw0rd" })).rejects.toBeInstanceOf(
+            const mockReq = {
+                ip: "127.0.0.1",
+                socket: {
+                    remoteAddress: "127.0.0.1"
+                }
+            };
+
+            await expect(controller.login({ email: "missing@example.com", password: "Passw0rd" }, mockReq)).rejects.toBeInstanceOf(
                 UnauthorizedException,
             );
 
