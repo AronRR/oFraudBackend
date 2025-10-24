@@ -7,7 +7,7 @@ import { JWT_ACCESS_TTL, JWT_REFRESH_TTL } from "src/config/jwt.config"
 import { RefreshTokenRepository } from "./refresh-token.repository"
 import * as crypto from "crypto"
 
-export type UserRole = 'user' | 'admin';
+export type UserRole = 'user' | 'admin' | 'superadmin';
 
 export type UserProfile = {
     id: string;

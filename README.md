@@ -541,3 +541,61 @@ Para comenzar:
 4. Ejecuta las migraciones
 5. Ejecuta `npm run start:dev`
 6. Visita `http://localhost:3000/docs`
+## Auditoría Administrativa
+
+El panel de superadministración expone un listado con cada acción relevante registrada por el backend.
+
+- **Endpoint**: `GET /admin/audit-logs`
+  - Requiere un token (`Authorization: Bearer`) asociado a un usuario con rol `superadmin`.
+  - Filtros disponibles: `page`, `limit`, `actionType`, `targetType`, `dateFrom`, `dateTo`.
+    - `actionType`: `login`, `approve_report`, `reject_report`, `delete_report`, `block_user`, `unblock_user`, `promote_user`, `demote_user`, `create_category`, `update_category`, `resolve_flag`, `bulk_action`.
+    - `targetType`: `report`, `user`, `category`, `flag`, `multiple`.
+- **Respuesta** (fragmento):
+
+```json
+{
+  "items": [
+    {
+      "id": 12,
+      "actionType": "approve_report",
+      "targetType": "report",
+      "targetId": 87,
+      "details": {
+        "previousStatus": "pending",
+        "newStatus": "approved",
+        "revisionId": 132,
+        "note": "Cumple políticas"
+      },
+      "ipAddress": "192.168.1.15",
+      "createdAt": "2025-10-24T06:30:11.233Z",
+      "admin": {
+        "id": 3,
+        "email": "admin@ofraud.com",
+        "fullName": "Laura Márquez"
+      }
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 3 }
+}
+```
+
+- Validación rápida en MySQL:
+
+```sql
+SELECT action_type, target_type, details, created_at
+FROM admin_actions_audit
+ORDER BY created_at DESC
+LIMIT 10;
+```
+
+Acciones que generan registros automáticos:
+
+| Acción | Tipo guardado | Descripción |
+| --- | --- | --- |
+| Login de admin/superadmin | `login` | Cada autenticación exitosa |
+| Moderación de reportes | `approve_report` / `reject_report` | Registra estado previo, revisión y notas |
+| Eliminación de reportes | `delete_report` | Guarda estado previo antes de eliminar |
+| Bloqueo / desbloqueo de usuarios | `block_user` / `unblock_user` | Incluye motivo cuando se proporciona |
+| Creación / actualización de categorías | `create_category` / `update_category` | Detalla slug y cambios aplicados |
+| Resolución de flags | `resolve_flag` | Indica estado anterior y nuevo del flag |
+| Promoción / degradación de administradores | `promote_user` / `demote_user` | Guarda roles de origen/destino y motivos |

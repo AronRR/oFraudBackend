@@ -149,10 +149,12 @@ export class InsightsService {
    * Lista todos los temas educativos disponibles
    */
   async listEducationalTopics(): Promise<{ topic: string; title: string }[]> {
-    const topics = Object.keys(educationalData).map((key) => ({
-      topic: key,
-      title: (educationalData as any)[key].title,
-    }));
+    const topics = Object.keys(educationalData)
+      .map((key) => ({
+        topic: key,
+        title: (educationalData as any)[key].title,
+      }))
+      .filter((item) => item.title !== undefined && item.title !== null); // Filter out entries without title
 
     return topics;
   }

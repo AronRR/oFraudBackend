@@ -10,12 +10,14 @@ import { LoginRequestDto } from "./dto/login-request.dto";
 import { LoginResponseDto } from "./dto/login-response.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { TokenService } from "./tokens.service";
+import { AdminActionsAuditRepository } from "src/admin/admin-actions-audit.repository";
 
 @ApiTags("Auth")
 @Controller("auth")
 export class AuthController{
     constructor(private readonly tokenService: TokenService,
-        private readonly userService: UserService
+        private readonly userService: UserService,
+        private readonly adminActionsAuditRepository: AdminActionsAuditRepository,
     ){}
     
     @Post("login")
@@ -35,6 +37,20 @@ export class AuthController{
         const accessToken = await this.tokenService.generateAccess(userProfile);
         const ipAddress = req.ip || req.socket?.remoteAddress;
         const refreshToken= await this.tokenService.generateRefresh(usuario.id.toString(), ipAddress);
+        if (usuario.role === 'admin' || usuario.role === 'superadmin') {
+            try {
+                await this.adminActionsAuditRepository.recordAction({
+                    adminId: usuario.id,
+                    actionType: 'login',
+                    targetType: 'user',
+                    targetId: usuario.id,
+                    details: { email: usuario.email },
+                    ipAddress,
+                });
+            } catch (error) {
+                // No interrumpir el flujo de inicio de sesión si la auditoría falla.
+            }
+        }
         return { message: "Inicio de sesión exitoso", accessToken, refreshToken };
     }
 

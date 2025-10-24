@@ -1,6 +1,6 @@
 /* eslint-disable prettier/prettier */
 
-import { Body, Controller, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, NotFoundException, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import type { AuthenticatedRequest } from "src/common/interfaces/authenticated-request";
@@ -22,6 +22,19 @@ export class UserController {
     @ApiResponse({ status: 500, description: "Error interno del servidor" })
     async registerUser(@Body() userDto: CreateUserDto): Promise<UserResponseDto> {
         const user = await this.userService.registerUser(userDto);
+        return toUserResponseDto(user);
+    }
+
+    @Get("me")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Obtener el perfil del usuario autenticado" })
+    @ApiOkResponse({ description: "Perfil del usuario", type: UserResponseDto })
+    async getCurrentUser(@Req() req: AuthenticatedRequest): Promise<UserResponseDto> {
+        const user = await this.userService.findById(Number(req.user.userId));
+        if (!user) {
+            throw new NotFoundException("Usuario no encontrado");
+        }
         return toUserResponseDto(user);
     }
 

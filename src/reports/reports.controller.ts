@@ -96,6 +96,7 @@ export class ReportsController {
   async moderateReport(@Req() req: AuthenticatedRequest, @Body() dto: ModerateReportDto) {
     const userId = Number(req.user.userId);
     const role = req.user.role;
+    const ipAddress = req.ip || req.socket?.remoteAddress;
     await this.reportsService.moderateReport(
       { userId, role },
       {
@@ -107,6 +108,7 @@ export class ReportsController {
         rejectionReasonText: dto.rejectionReasonText,
         note: dto.note,
       },
+      ipAddress,
     );
     return { success: true };
   }

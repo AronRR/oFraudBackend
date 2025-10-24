@@ -6,7 +6,7 @@ import { DbService } from "src/db/db.service";
 import { UserProfileAuditRepository, UserProfileAuditChange } from "./audit/user-profile-audit.repository";
 import { UserSecurityAuditRepository } from "./audit/user-security-audit.repository";
 
-export type UserRole = "user" | "admin";
+export type UserRole = "user" | "admin" | "superadmin";
 
 export type User = {
     id: number;

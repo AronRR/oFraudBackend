@@ -121,6 +121,8 @@ export interface AdminReportRow {
   authorName: string | null;
   reviewerId: number | null;
   reviewerName: string | null;
+  thumbnailUrl: string | null;
+  thumbnailType: string | null;
   createdAt: Date;
   updatedAt: Date;
   reviewedAt: Date | null;
@@ -178,7 +180,7 @@ export class ReportRepository {
       params.push(status);
     }
 
-    const query = `
+    const baseSelect = `
       SELECT
         r.id AS report_id,
         r.status,
@@ -203,16 +205,20 @@ export class ReportRepository {
         r.review_notes,
         r.rejection_reason_text
       FROM reports r
-      INNER JOIN report_revisions rr ON rr.id = r.current_revision_id
       LEFT JOIN categories c ON c.id = r.category_id
       LEFT JOIN users u ON u.id = r.author_id
+    `;
+
+    const primaryQuery = `
+      ${baseSelect}
+      INNER JOIN report_revisions rr ON rr.id = r.current_revision_id
       WHERE ${conditions.join(' AND ')}
       LIMIT 1
     `;
 
-    const [rows] = await this.dbService.getPool().query<RowDataPacket[]>(query, params);
+    const [rows] = await this.dbService.getPool().query<RowDataPacket[]>(primaryQuery, params);
 
-    const row = (rows as unknown as Array<{
+    const mapRow = (row: {
       report_id: number;
       status: ReportStatus;
       category_id: number | null;
@@ -223,7 +229,7 @@ export class ReportRepository {
       published_at: Date | null;
       approved_at: Date | null;
       created_at: Date;
-      revision_id: number;
+      revision_id: number | null;
       title: string | null;
       description: string;
       incident_url: string;
@@ -235,36 +241,56 @@ export class ReportRepository {
       author_username: string | null;
       review_notes: string | null;
       rejection_reason_text: string | null;
-    }>)[0];
+    }) => {
+      const revisionId = row.revision_id != null ? Number(row.revision_id) : 0;
+      return {
+        reportId: row.report_id,
+        status: row.status,
+        categoryId: row.category_id,
+        categoryName: row.category_name,
+        categorySlug: row.category_slug,
+        ratingAverage: row.rating_average,
+        ratingCount: Number(row.rating_count ?? 0),
+        publishedAt: row.published_at ?? null,
+        approvedAt: row.approved_at ?? null,
+        createdAt: row.created_at,
+        revisionId,
+        title: row.title ?? null,
+        description: row.description,
+        incidentUrl: row.incident_url,
+        publisherHost: row.publisher_host,
+        isAnonymous: row.is_anonymous === 1,
+        authorId: row.author_id ?? null,
+        authorFirstName: row.author_first_name,
+        authorLastName: row.author_last_name,
+        authorUsername: row.author_username,
+        reviewNotes: row.review_notes ?? null,
+        rejectionReasonText: row.rejection_reason_text ?? null,
+      };
+    };
+
+    let row = (rows as unknown as Array<Parameters<typeof mapRow>[0]>)[0];
 
     if (!row) {
-      return undefined;
+      const fallbackQuery = `
+        ${baseSelect}
+        INNER JOIN report_revisions rr ON rr.report_id = r.id
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY rr.version_number DESC, rr.created_at DESC
+        LIMIT 1
+      `;
+      const [fallbackRows] = await this.dbService.getPool().query<RowDataPacket[]>(fallbackQuery, params);
+      row = (fallbackRows as unknown as Array<Parameters<typeof mapRow>[0]>)[0];
+      if (!row) {
+        return undefined;
+      }
     }
 
-    return {
-      reportId: row.report_id,
-      status: row.status,
-      categoryId: row.category_id,
-      categoryName: row.category_name,
-      categorySlug: row.category_slug,
-      ratingAverage: row.rating_average,
-      ratingCount: Number(row.rating_count ?? 0),
-      publishedAt: row.published_at ?? null,
-      approvedAt: row.approved_at ?? null,
-      createdAt: row.created_at,
-      revisionId: row.revision_id,
-      title: row.title ?? null,
-      description: row.description,
-      incidentUrl: row.incident_url,
-      publisherHost: row.publisher_host,
-      isAnonymous: row.is_anonymous === 1,
-      authorId: row.author_id ?? null,
-      authorFirstName: row.author_first_name,
-      authorLastName: row.author_last_name,
-      authorUsername: row.author_username,
-      reviewNotes: row.review_notes ?? null,
-      rejectionReasonText: row.rejection_reason_text ?? null,
-    };
+    const mapped = mapRow(row);
+    if (!mapped.revisionId) {
+      return undefined;
+    }
+    return mapped;
   }
 
   async findReportForUpdate(reportId: number, conn: PoolConnection): Promise<ReportRecord | undefined> {
@@ -725,6 +751,7 @@ export class ReportRepository {
       LEFT JOIN categories c ON c.id = r.category_id
       LEFT JOIN users u ON u.id = r.author_id
       LEFT JOIN users reviewer ON reviewer.id = r.reviewed_by
+      LEFT JOIN report_media rm ON rm.revision_id = rr.id AND rm.position = 1 AND rm.deleted_at IS NULL
       WHERE ${conditions.join(' AND ')}
     `;
 
@@ -745,7 +772,9 @@ export class ReportRepository {
         u.email AS author_email,
         CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS author_name,
         reviewer.id AS reviewer_id,
-        CONCAT(COALESCE(reviewer.first_name, ''), ' ', COALESCE(reviewer.last_name, '')) AS reviewer_name
+        CONCAT(COALESCE(reviewer.first_name, ''), ' ', COALESCE(reviewer.last_name, '')) AS reviewer_name,
+        rm.file_url AS thumbnail_url,
+        rm.media_type AS thumbnail_type
       ${baseQuery}
       ORDER BY r.updated_at DESC, r.id DESC
       LIMIT ? OFFSET ?
@@ -778,6 +807,8 @@ export class ReportRepository {
       author_name: string | null;
       reviewer_id: number | null;
       reviewer_name: string | null;
+      thumbnail_url: string | null;
+      thumbnail_type: string | null;
     }>).map((row) => ({
       reportId: row.report_id,
       title: row.title ?? null,
@@ -789,6 +820,8 @@ export class ReportRepository {
       authorName: row.author_name?.trim() ? row.author_name.trim() : null,
       reviewerId: row.reviewer_id ?? null,
       reviewerName: row.reviewer_name?.trim() ? row.reviewer_name.trim() : null,
+      thumbnailUrl: row.thumbnail_url ?? null,
+      thumbnailType: row.thumbnail_type ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       reviewedAt: row.reviewed_at ?? null,

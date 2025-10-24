@@ -1,8 +1,10 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { RowDataPacket } from 'mysql2';
 import { AdminRepository } from './admin.repository';
+import { AdminActionsAuditRepository } from './admin-actions-audit.repository';
 import { ReportRepository } from 'src/reports/report.repository';
 import { ReportFlagRepository } from 'src/reports/report-flag.repository';
+import { UserRepository } from 'src/users/user.repository';
 import type { ReportFlagAdminRow, ReportFlagRecord } from 'src/reports/report-flag.repository';
 import { GetAdminReportsQueryDto } from './dto/get-admin-reports-query.dto';
 import { GetAdminReportsResponseDto } from './dto/get-admin-reports-response.dto';
@@ -21,13 +23,20 @@ import { ReportFlagResponseDto } from 'src/reports/dto/report-flag-response.dto'
 import { GetAdminUsersQueryDto } from './dto/get-admin-users-query.dto';
 import { GetAdminUsersResponseDto, AdminUserDto } from './dto/get-admin-users-response.dto';
 import { AdminReportDetailDto } from './dto/admin-report-detail.dto';
+import { PromoteUserDto } from './dto/promote-user.dto';
+import { DemoteUserDto } from './dto/demote-user.dto';
+import { GetAdminsResponseDto, AdminListItemDto } from './dto/get-admins-response.dto';
+import { GetAuditLogsQueryDto } from './dto/get-audit-logs-query.dto';
+import { GetAuditLogsResponseDto, AdminActionAuditItemDto } from './dto/get-audit-logs-response.dto';
 
 @Injectable()
 export class AdminService {
   constructor(
     private readonly adminRepository: AdminRepository,
+    private readonly adminActionsAuditRepository: AdminActionsAuditRepository,
     private readonly reportRepository: ReportRepository,
     private readonly reportFlagRepository: ReportFlagRepository,
+    private readonly userRepository: UserRepository,
   ) {}
 
   async listReports(query: GetAdminReportsQueryDto): Promise<GetAdminReportsResponseDto> {
@@ -59,6 +68,8 @@ export class AdminService {
               name: item.reviewerName,
             }
           : null,
+        thumbnailUrl: item.thumbnailUrl ?? null,
+        thumbnailType: item.thumbnailType ?? null,
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
         reviewedAt: item.reviewedAt ? item.reviewedAt.toISOString() : null,
@@ -160,7 +171,12 @@ export class AdminService {
     };
   }
 
-  async resolveReportFlag(flagId: number, adminId: number, dto: ResolveReportFlagDto): Promise<ReportFlagResponseDto> {
+  async resolveReportFlag(
+    flagId: number,
+    adminId: number,
+    dto: ResolveReportFlagDto,
+    ipAddress?: string,
+  ): Promise<ReportFlagResponseDto> {
     return this.reportRepository.withTransaction(async (conn) => {
       const existing = await this.reportFlagRepository.findById(flagId, conn);
       if (!existing) {
@@ -181,11 +197,26 @@ export class AdminService {
         throw new NotFoundException('Flag no encontrado luego de actualizar');
       }
 
+      await this.adminActionsAuditRepository.recordAction(
+        {
+          adminId,
+          actionType: 'resolve_flag',
+          targetType: 'flag',
+          targetId: flagId,
+          details: {
+            previousStatus: existing.status,
+            newStatus: dto.status,
+          },
+          ipAddress,
+        },
+        conn,
+      );
+
       return this.mapFlagRecordToResponse(updated);
     });
   }
 
-  async removeReport(reportId: number, adminId: number): Promise<void> {
+  async removeReport(reportId: number, adminId: number, ipAddress?: string): Promise<void> {
     await this.reportRepository.withTransaction(async (conn) => {
       const existing = await this.reportRepository.findReportForUpdate(reportId, conn);
       if (!existing) {
@@ -214,6 +245,20 @@ export class AdminService {
         rejectionReasonText: null,
         note: 'Removed by admin',
       });
+      await this.adminActionsAuditRepository.recordAction(
+        {
+          adminId,
+          actionType: 'delete_report',
+          targetType: 'report',
+          targetId: reportId,
+          details: {
+            previousStatus: existing.status,
+            note: 'Removed by admin',
+          },
+          ipAddress,
+        },
+        conn,
+      );
     });
   }
 
@@ -222,36 +267,91 @@ export class AdminService {
     return rows.map((row) => this.mapCategory(row));
   }
 
-  async createCategory(payload: CreateCategoryDto): Promise<CategoryResponseDto> {
+  async createCategory(
+    payload: CreateCategoryDto,
+    adminId: number,
+    ipAddress?: string,
+  ): Promise<CategoryResponseDto> {
     const row = await this.adminRepository.createCategory(payload);
     if (!row) {
       throw new NotFoundException('No se pudo crear la categoría');
     }
 
-    return this.mapCategory(row);
+    const category = this.mapCategory(row);
+    await this.adminActionsAuditRepository.recordAction({
+      adminId,
+      actionType: 'create_category',
+      targetType: 'category',
+      targetId: category.id,
+      details: {
+        name: category.name,
+        slug: category.slug,
+        isActive: category.is_active,
+      },
+      ipAddress,
+    });
+
+    return category;
   }
 
-  async updateCategory(id: number, payload: UpdateCategoryDto): Promise<CategoryResponseDto> {
+  async updateCategory(
+    id: number,
+    payload: UpdateCategoryDto,
+    adminId: number,
+    ipAddress?: string,
+  ): Promise<CategoryResponseDto> {
     const row = await this.adminRepository.updateCategory(id, payload);
     if (!row) {
       throw new NotFoundException('Categoría no encontrada');
     }
 
-    return this.mapCategory(row);
+    const category = this.mapCategory(row);
+    const changes = Object.fromEntries(
+      Object.entries(payload).filter(([, value]) => value !== undefined),
+    );
+    await this.adminActionsAuditRepository.recordAction({
+      adminId,
+      actionType: 'update_category',
+      targetType: 'category',
+      targetId: category.id,
+      details: {
+        changes,
+      },
+      ipAddress,
+    });
+
+    return category;
   }
 
-  async blockUser(userId: number, adminId: number, payload: BlockUserDto): Promise<void> {
+  async blockUser(userId: number, adminId: number, payload: BlockUserDto, ipAddress?: string): Promise<void> {
     const updated = await this.adminRepository.blockUser(userId, adminId, payload.reason);
     if (!updated) {
       throw new NotFoundException('Usuario no encontrado');
     }
+
+    await this.adminActionsAuditRepository.recordAction({
+      adminId,
+      actionType: 'block_user',
+      targetType: 'user',
+      targetId: userId,
+      details: { reason: payload.reason ?? null },
+      ipAddress,
+    });
   }
 
-  async unblockUser(userId: number, adminId: number): Promise<void> {
+  async unblockUser(userId: number, adminId: number, ipAddress?: string): Promise<void> {
     const updated = await this.adminRepository.unblockUser(userId, adminId);
     if (!updated) {
       throw new NotFoundException('Usuario no encontrado');
     }
+
+    await this.adminActionsAuditRepository.recordAction({
+      adminId,
+      actionType: 'unblock_user',
+      targetType: 'user',
+      targetId: userId,
+      ipAddress,
+    });
   }
 
   async listUsers(query: GetAdminUsersQueryDto): Promise<GetAdminUsersResponseDto> {
@@ -382,6 +482,172 @@ export class AdminService {
       created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
       updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
     };
+  }
+
+  async listAdmins(): Promise<GetAdminsResponseDto> {
+    const rows = await this.adminRepository.listAdmins();
+
+    let adminsCount = 0;
+    let superadminsCount = 0;
+
+    const items: AdminListItemDto[] = rows.map((row) => {
+      const role = row.role as 'admin' | 'superadmin';
+      if (role === 'admin') adminsCount++;
+      if (role === 'superadmin') superadminsCount++;
+
+      return {
+        id: Number(row.id),
+        email: String(row.email),
+        username: String(row.username),
+        fullName: `${row.first_name} ${row.last_name}`.trim(),
+        role,
+        createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+        lastLoginAt: row.last_login_at ? (row.last_login_at instanceof Date ? row.last_login_at.toISOString() : String(row.last_login_at)) : null,
+      };
+    });
+
+    return {
+      items,
+      meta: {
+        total: items.length,
+        admins: adminsCount,
+        superadmins: superadminsCount,
+      },
+    };
+  }
+
+  async promoteUserToAdmin(userId: number, promotedBy: number, dto: PromoteUserDto, ipAddress?: string): Promise<void> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (user.role !== 'user') {
+      throw new BadRequestException('Solo se pueden promover usuarios regulares');
+    }
+
+    const updated = await this.adminRepository.promoteUserToAdmin(userId);
+    if (!updated) {
+      throw new BadRequestException('No se pudo promover al usuario');
+    }
+
+    // Registrar en auditoría de promociones
+    await this.adminActionsAuditRepository.recordPromotion({
+      userId,
+      promotedBy,
+      fromRole: 'user',
+      toRole: 'admin',
+      reason: dto.reason,
+    });
+
+    // Registrar acción en auditoría general
+    await this.adminActionsAuditRepository.recordAction({
+      adminId: promotedBy,
+      actionType: 'promote_user',
+      targetType: 'user',
+      targetId: userId,
+      details: { reason: dto.reason },
+      ipAddress,
+    });
+  }
+
+  async demoteAdminToUser(userId: number, demotedBy: number, dto: DemoteUserDto, ipAddress?: string): Promise<void> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (user.role !== 'admin') {
+      throw new BadRequestException('Solo se pueden degradar administradores regulares');
+    }
+
+    const updated = await this.adminRepository.demoteAdminToUser(userId);
+    if (!updated) {
+      throw new BadRequestException('No se pudo degradar al administrador');
+    }
+
+    // Registrar en auditoría de promociones
+    await this.adminActionsAuditRepository.recordPromotion({
+      userId,
+      promotedBy: demotedBy,
+      fromRole: 'admin',
+      toRole: 'user',
+      reason: dto.reason,
+    });
+
+    // Registrar acción en auditoría general
+    await this.adminActionsAuditRepository.recordAction({
+      adminId: demotedBy,
+      actionType: 'demote_user',
+      targetType: 'user',
+      targetId: userId,
+      details: { reason: dto.reason },
+      ipAddress,
+    });
+  }
+
+  async getAuditLogs(query: GetAuditLogsQueryDto): Promise<GetAuditLogsResponseDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const offset = (page - 1) * limit;
+
+    const { items, total } = await this.adminActionsAuditRepository.listAuditLogs({
+      adminId: query.adminId,
+      actionType: query.actionType as any,
+      targetType: query.targetType as any,
+      dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
+      dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
+      limit,
+      offset,
+    });
+
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        adminId: item.admin_id,
+        adminEmail: item.admin_email ?? null,
+        adminName: item.admin_name ?? null,
+        actionType: item.action_type,
+        targetType: item.target_type,
+        targetId: item.target_id,
+        details: this.parseAuditDetails(item.details),
+        ipAddress: item.ip_address,
+        createdAt: item.created_at.toISOString(),
+        admin: {
+          id: item.admin_id,
+          email: item.admin_email ?? null,
+          fullName: item.admin_name?.trim()
+            ? item.admin_name.trim()
+            : item.admin_email ?? `Admin #${item.admin_id}`,
+        },
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+      },
+    };
+  }
+
+  private parseAuditDetails(details: unknown): Record<string, unknown> | null {
+    if (!details) {
+      return null;
+    }
+    if (typeof details === 'object' && details != null && Buffer.isBuffer(details)) {
+      const text = details.toString('utf8');
+      return this.parseAuditDetails(text);
+    }
+    if (typeof details === 'object') {
+      return details as Record<string, unknown>;
+    }
+    if (typeof details === 'string') {
+      try {
+        return JSON.parse(details) as Record<string, unknown>;
+      } catch {
+        return { raw: details };
+      }
+    }
+    return { raw: details };
   }
 }
 

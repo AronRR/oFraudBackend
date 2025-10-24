@@ -44,6 +44,12 @@ export class AdminReportListItemDto {
   @ApiProperty({ type: AdminReportReviewerDto, nullable: true })
   reviewer: AdminReportReviewerDto | null;
 
+  @ApiProperty({ description: 'URL de la primera imagen del reporte para preview', nullable: true, example: 'http://localhost:3000/public/uploads/abc123.jpg' })
+  thumbnailUrl: string | null;
+
+  @ApiProperty({ description: 'Tipo de media de la primera imagen', nullable: true, example: 'image' })
+  thumbnailType: string | null;
+
   @ApiProperty({ description: 'Fecha de creación del reporte en formato ISO 8601' })
   createdAt: string;
 

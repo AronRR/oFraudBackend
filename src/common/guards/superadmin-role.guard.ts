@@ -2,13 +2,13 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@
 import { AuthenticatedRequest } from '../interfaces/authenticated-request';
 
 @Injectable()
-export class AdminRoleGuard implements CanActivate {
+export class SuperAdminRoleGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
 
-    if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) {
-      throw new ForbiddenException('Acceso restringido a administradores');
+    if (!user || user.role !== 'superadmin') {
+      throw new ForbiddenException('Acceso restringido a super administradores');
     }
 
     return true;

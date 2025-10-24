@@ -24,6 +24,7 @@ import { GetReportCommentsResponseDto, ReportCommentDto } from './dto/get-report
 import { CreateReportFlagDto } from './dto/create-report-flag.dto';
 import { ReportFlagResponseDto } from './dto/report-flag-response.dto';
 import { ReportDetailDto } from './dto/report-detail.dto';
+import { AdminActionsAuditRepository } from 'src/admin/admin-actions-audit.repository';
 
 interface UserContext {
   userId: number;
@@ -41,6 +42,7 @@ export class ReportsService {
     private readonly reportRatingRepository: ReportRatingRepository,
     private readonly reportCommentRepository: ReportCommentRepository,
     private readonly reportFlagRepository: ReportFlagRepository,
+    private readonly adminActionsAuditRepository: AdminActionsAuditRepository,
   ) {}
 
   async getApprovedReports(query: GetReportsQueryDto): Promise<GetReportsResponseDto> {
@@ -282,16 +284,20 @@ export class ReportsService {
     });
   }
 
-  async moderateReport(admin: UserContext, payload: {
-    action: 'approve' | 'reject';
-    reportId: number;
-    revisionId?: number;
-    rejectionReasonId?: number;
-    rejectionReasonCode?: string | null;
-    rejectionReasonText?: string | null;
-    note?: string | null;
-  }): Promise<void> {
-    if (admin.role !== 'admin') {
+  async moderateReport(
+    admin: UserContext,
+    payload: {
+      action: 'approve' | 'reject';
+      reportId: number;
+      revisionId?: number;
+      rejectionReasonId?: number;
+      rejectionReasonCode?: string | null;
+      rejectionReasonText?: string | null;
+      note?: string | null;
+    },
+    ipAddress?: string,
+  ): Promise<void> {
+    if (admin.role !== 'admin' && admin.role !== 'superadmin') {
       throw new ForbiddenException('Insufficient permissions');
     }
 
@@ -310,6 +316,12 @@ export class ReportsService {
       if (!approvalRevisionId) {
         throw new BadRequestException('No revision selected for moderation');
       }
+
+      const auditDetails: Record<string, unknown> = {
+        previousStatus,
+        revisionId: approvalRevisionId,
+      };
+      let actionType: 'approve_report' | 'reject_report';
 
       if (payload.action === 'approve') {
         if (previousStatus === 'approved') {
@@ -333,43 +345,77 @@ export class ReportsService {
           changedBy: admin.userId,
           note: payload.note ?? null,
         });
-        return;
+        actionType = 'approve_report';
+        auditDetails.newStatus = 'approved';
+        if (payload.note !== undefined) {
+          auditDetails.note = payload.note ?? null;
+        }
+      } else {
+        if (previousStatus === 'rejected') {
+          throw new BadRequestException('Report is already rejected');
+        }
+
+        const reasonRecord = payload.rejectionReasonId
+          ? await this.rejectionReasonRepository.findById(payload.rejectionReasonId)
+          : payload.rejectionReasonCode
+          ? await this.rejectionReasonRepository.findByCode(payload.rejectionReasonCode)
+          : undefined;
+
+        const rejectionReasonId = reasonRecord?.id ?? payload.rejectionReasonId ?? null;
+        const rejectionReasonCode = reasonRecord?.code ?? payload.rejectionReasonCode ?? null;
+        const rejectionReasonText = payload.rejectionReasonText ?? reasonRecord?.label ?? null;
+
+        await this.reportRepository.updateReportStatus(conn, {
+          reportId: payload.reportId,
+          status: 'rejected',
+          reviewerId: admin.userId,
+          reviewNotes: payload.note ?? null,
+          rejectionReasonId,
+          rejectionReasonText,
+          lock: true,
+        });
+        await this.reportRepository.updateReportCurrentRevision(conn, payload.reportId, approvalRevisionId);
+        await this.reportRepository.appendStatusHistory(conn, {
+          reportId: payload.reportId,
+          fromStatus: previousStatus as ReportStatus,
+          toStatus: 'rejected',
+          changedBy: admin.userId,
+          rejectionReasonId,
+          rejectionReasonCode,
+          rejectionReasonText,
+          note: payload.note ?? null,
+        });
+
+        actionType = 'reject_report';
+        auditDetails.newStatus = 'rejected';
+        if (payload.note !== undefined) {
+          auditDetails.note = payload.note ?? null;
+        }
+        if (rejectionReasonId !== null) {
+          auditDetails.rejectionReasonId = rejectionReasonId;
+        }
+        if (rejectionReasonCode) {
+          auditDetails.rejectionReasonCode = rejectionReasonCode;
+        }
+        if (rejectionReasonText) {
+          auditDetails.rejectionReasonText = rejectionReasonText;
+        }
+        if (payload.rejectionReasonText !== undefined) {
+          auditDetails.submittedReasonText = payload.rejectionReasonText ?? null;
+        }
       }
 
-      if (previousStatus === 'rejected') {
-        throw new BadRequestException('Report is already rejected');
-      }
-
-      const reasonRecord = payload.rejectionReasonId
-        ? await this.rejectionReasonRepository.findById(payload.rejectionReasonId)
-        : payload.rejectionReasonCode
-        ? await this.rejectionReasonRepository.findByCode(payload.rejectionReasonCode)
-        : undefined;
-
-      const rejectionReasonId = reasonRecord?.id ?? payload.rejectionReasonId ?? null;
-      const rejectionReasonCode = reasonRecord?.code ?? payload.rejectionReasonCode ?? null;
-      const rejectionReasonText = payload.rejectionReasonText ?? reasonRecord?.label ?? null;
-
-      await this.reportRepository.updateReportStatus(conn, {
-        reportId: payload.reportId,
-        status: 'rejected',
-        reviewerId: admin.userId,
-        reviewNotes: payload.note ?? null,
-        rejectionReasonId,
-        rejectionReasonText,
-        lock: true,
-      });
-      await this.reportRepository.updateReportCurrentRevision(conn, payload.reportId, approvalRevisionId);
-      await this.reportRepository.appendStatusHistory(conn, {
-        reportId: payload.reportId,
-        fromStatus: previousStatus as ReportStatus,
-        toStatus: 'rejected',
-        changedBy: admin.userId,
-        rejectionReasonId,
-        rejectionReasonCode,
-        rejectionReasonText,
-        note: payload.note ?? null,
-      });
+      await this.adminActionsAuditRepository.recordAction(
+        {
+          adminId: admin.userId,
+          actionType,
+          targetType: 'report',
+          targetId: payload.reportId,
+          details: auditDetails,
+          ipAddress,
+        },
+        conn,
+      );
     });
   }
 
@@ -454,7 +500,7 @@ export class ReportsService {
         throw new NotFoundException('Rating not found');
       }
 
-      if (existing.user_id !== user.userId && user.role !== 'admin') {
+      if (existing.user_id !== user.userId && user.role !== 'admin' && user.role !== 'superadmin') {
         throw new ForbiddenException('You cannot modify this rating');
       }
 
@@ -501,7 +547,7 @@ export class ReportsService {
         throw new NotFoundException('Rating not found');
       }
 
-      if (existing.user_id !== user.userId && user.role !== 'admin') {
+      if (existing.user_id !== user.userId && user.role !== 'admin' && user.role !== 'superadmin') {
         throw new ForbiddenException('You cannot delete this rating');
       }
 
@@ -613,7 +659,7 @@ export class ReportsService {
         throw new NotFoundException('Comment not found');
       }
 
-      if (existing.user_id !== user.userId && user.role !== 'admin') {
+      if (existing.user_id !== user.userId && user.role !== 'admin' && user.role !== 'superadmin') {
         throw new ForbiddenException('You cannot modify this comment');
       }
 
@@ -646,7 +692,7 @@ export class ReportsService {
         throw new NotFoundException('Comment not found');
       }
 
-      if (existing.user_id !== user.userId && user.role !== 'admin') {
+      if (existing.user_id !== user.userId && user.role !== 'admin' && user.role !== 'superadmin') {
         throw new ForbiddenException('You cannot delete this comment');
       }
 

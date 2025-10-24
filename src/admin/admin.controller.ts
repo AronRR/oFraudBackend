@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuer
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { AdminRoleGuard } from 'src/common/guards/admin-role.guard';
+import { SuperAdminRoleGuard } from 'src/common/guards/superadmin-role.guard';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CategoryResponseDto } from './dto/category-response.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -21,6 +22,11 @@ import { ResolveReportFlagDto } from './dto/resolve-report-flag.dto';
 import { ReportFlagResponseDto } from 'src/reports/dto/report-flag-response.dto';
 import { GetAdminUsersQueryDto } from './dto/get-admin-users-query.dto';
 import { GetAdminUsersResponseDto } from './dto/get-admin-users-response.dto';
+import { PromoteUserDto } from './dto/promote-user.dto';
+import { DemoteUserDto } from './dto/demote-user.dto';
+import { GetAdminsResponseDto } from './dto/get-admins-response.dto';
+import { GetAuditLogsQueryDto } from './dto/get-audit-logs-query.dto';
+import { GetAuditLogsResponseDto } from './dto/get-audit-logs-response.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -59,7 +65,8 @@ export class AdminController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ReportFlagResponseDto> {
     const adminId = Number(req.user.userId);
-    return this.adminService.resolveReportFlag(id, adminId, dto);
+    const ipAddress = req.ip || req.socket?.remoteAddress;
+    return this.adminService.resolveReportFlag(id, adminId, dto, ipAddress);
   }
 
   @Get('categories')
@@ -72,8 +79,13 @@ export class AdminController {
   @Post('categories')
   @ApiOperation({ summary: 'Crear una nueva categoría' })
   @ApiCreatedResponse({ type: CategoryResponseDto })
-  async createCategory(@Body() body: CreateCategoryDto): Promise<CategoryResponseDto> {
-    return this.adminService.createCategory(body);
+  async createCategory(
+    @Body() body: CreateCategoryDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<CategoryResponseDto> {
+    const adminId = Number(req.user.userId);
+    const ipAddress = req.ip || req.socket?.remoteAddress;
+    return this.adminService.createCategory(body, adminId, ipAddress);
   }
 
   @Put('categories/:id')
@@ -82,8 +94,11 @@ export class AdminController {
   async updateCategory(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateCategoryDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<CategoryResponseDto> {
-    return this.adminService.updateCategory(id, body);
+    const adminId = Number(req.user.userId);
+    const ipAddress = req.ip || req.socket?.remoteAddress;
+    return this.adminService.updateCategory(id, body, adminId, ipAddress);
   }
 
   @Get('users')
@@ -102,7 +117,8 @@ export class AdminController {
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
     const adminId = Number(req.user.userId);
-    await this.adminService.blockUser(id, adminId, body);
+    const ipAddress = req.ip || req.socket?.remoteAddress;
+    await this.adminService.blockUser(id, adminId, body, ipAddress);
   }
 
   @Delete('users/:id/block')
@@ -113,7 +129,8 @@ export class AdminController {
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
     const adminId = Number(req.user.userId);
-    await this.adminService.unblockUser(id, adminId);
+    const ipAddress = req.ip || req.socket?.remoteAddress;
+    await this.adminService.unblockUser(id, adminId, ipAddress);
   }
 
   @Delete('reports/:id')
@@ -124,7 +141,8 @@ export class AdminController {
     @Req() req: AuthenticatedRequest,
   ): Promise<{ success: true }> {
     const adminId = Number(req.user.userId);
-    await this.adminService.removeReport(id, adminId);
+    const ipAddress = req.ip || req.socket?.remoteAddress;
+    await this.adminService.removeReport(id, adminId, ipAddress);
     return { success: true };
   }
 
@@ -153,6 +171,52 @@ export class AdminController {
     const parsed = Number(limit);
     const sanitizedLimit = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 5;
     return this.adminService.getTopHosts(sanitizedLimit);
+  }
+
+  @Get('admins')
+  @UseGuards(JwtAuthGuard, SuperAdminRoleGuard)
+  @ApiOperation({ summary: 'Listar todos los administradores (solo superadmin)' })
+  @ApiOkResponse({ type: GetAdminsResponseDto })
+  async listAdmins(): Promise<GetAdminsResponseDto> {
+    return this.adminService.listAdmins();
+  }
+
+  @Post('users/:id/promote')
+  @UseGuards(JwtAuthGuard, SuperAdminRoleGuard)
+  @ApiOperation({ summary: 'Promover un usuario a administrador (solo superadmin)' })
+  @ApiOkResponse({ description: 'Usuario promovido correctamente' })
+  async promoteUser(
+    @Param('id', ParseIntPipe) userId: number,
+    @Body() dto: PromoteUserDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{ success: true; message: string }> {
+    const adminId = Number(req.user.userId);
+    const ipAddress = req.ip || req.socket?.remoteAddress;
+    await this.adminService.promoteUserToAdmin(userId, adminId, dto, ipAddress);
+    return { success: true, message: 'Usuario promovido a administrador correctamente' };
+  }
+
+  @Post('users/:id/demote')
+  @UseGuards(JwtAuthGuard, SuperAdminRoleGuard)
+  @ApiOperation({ summary: 'Degradar un administrador a usuario regular (solo superadmin)' })
+  @ApiOkResponse({ description: 'Administrador degradado correctamente' })
+  async demoteUser(
+    @Param('id', ParseIntPipe) userId: number,
+    @Body() dto: DemoteUserDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{ success: true; message: string }> {
+    const adminId = Number(req.user.userId);
+    const ipAddress = req.ip || req.socket?.remoteAddress;
+    await this.adminService.demoteAdminToUser(userId, adminId, dto, ipAddress);
+    return { success: true, message: 'Administrador degradado a usuario regular correctamente' };
+  }
+
+  @Get('audit-logs')
+  @UseGuards(JwtAuthGuard, SuperAdminRoleGuard)
+  @ApiOperation({ summary: 'Obtener logs de auditoría de acciones administrativas (solo superadmin)' })
+  @ApiOkResponse({ type: GetAuditLogsResponseDto })
+  async getAuditLogs(@Query() query: GetAuditLogsQueryDto): Promise<GetAuditLogsResponseDto> {
+    return this.adminService.getAuditLogs(query);
   }
 }
 

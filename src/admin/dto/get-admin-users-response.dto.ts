@@ -19,8 +19,8 @@ export class AdminUserDto {
   @ApiProperty({ nullable: true })
   phone_number: string | null;
 
-  @ApiProperty({ enum: ['user', 'admin'] })
-  role: 'user' | 'admin';
+  @ApiProperty({ enum: ['user', 'admin', 'superadmin'] })
+  role: 'user' | 'admin' | 'superadmin';
 
   @ApiProperty()
   is_blocked: boolean;

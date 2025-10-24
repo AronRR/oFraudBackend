@@ -343,4 +343,36 @@ export class AdminRepository {
 
     return rows;
   }
+
+  async listAdmins(): Promise<RowDataPacket[]> {
+    const sql = `
+      SELECT
+        id,
+        email,
+        username,
+        first_name,
+        last_name,
+        role,
+        created_at,
+        last_login_at
+      FROM users
+      WHERE role IN ('admin', 'superadmin') AND deleted_at IS NULL
+      ORDER BY role DESC, created_at DESC
+    `;
+
+    const [rows] = await this.dbService.getPool().query<RowDataPacket[]>(sql);
+    return rows;
+  }
+
+  async promoteUserToAdmin(userId: number): Promise<boolean> {
+    const sql = `UPDATE users SET role = 'admin', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND role = 'user' AND deleted_at IS NULL`;
+    const [result] = await this.dbService.getPool().execute<ResultSetHeader>(sql, [userId]);
+    return result.affectedRows > 0;
+  }
+
+  async demoteAdminToUser(userId: number): Promise<boolean> {
+    const sql = `UPDATE users SET role = 'user', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND role = 'admin' AND deleted_at IS NULL`;
+    const [result] = await this.dbService.getPool().execute<ResultSetHeader>(sql, [userId]);
+    return result.affectedRows > 0;
+  }
 }
